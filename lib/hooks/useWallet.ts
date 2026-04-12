@@ -1,46 +1,44 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "../api";
-import { useWalletStore } from "../../store/useWalletStore";
-import { useToastStore } from "../../store/useToastStore";
+import { apiClient } from "../api/client";
+import { ENDPOINTS } from "../api/endpoints";
+import { WalletBalance, FundWalletResponse, ApiResponse } from "@/types/api";
+import * as WebBrowser from "expo-web-browser";
 
-export const useWallet = () => {
-  const queryClient = useQueryClient();
-  const { setBalance, setTransactions } = useWalletStore();
-  const { show: showToast } = useToastStore();
-
-  const getBalance = useQuery({
+export const useWalletBalance = () => {
+  return useQuery<WalletBalance>({
     queryKey: ["wallet-balance"],
     queryFn: async () => {
-      const response = await api.get("/wallet/balance");
-      setBalance(response.data.balance);
-      return response.data;
+      const response = await apiClient.get<ApiResponse<WalletBalance>>(
+        ENDPOINTS.WALLET.BALANCE,
+      );
+      return response.data.data;
+    },
+    staleTime: 30000,
+  });
+};
+
+interface FundWalletParams {
+  amount: number;
+  email: string;
+}
+
+export const useFundWallet = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ amount, email }: FundWalletParams) => {
+      const response = await apiClient.post<ApiResponse<FundWalletResponse>>(
+        ENDPOINTS.WALLET.FUND,
+        { amount, email },
+      );
+      return response.data.data;
+    },
+    onSuccess: async (data) => {
+      if (data.authorization_url) {
+        await WebBrowser.openAuthSessionAsync(data.authorization_url);
+        // After browser closes, refetch balance
+        queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
+      }
     },
   });
-
-  const getTransactions = useQuery({
-    queryKey: ["wallet-transactions"],
-    queryFn: async () => {
-      const response = await api.get("/wallet/transactions");
-      setTransactions(response.data);
-      return response.data;
-    },
-  });
-
-  const fundWallet = useMutation({
-    mutationFn: async (amount: number) => {
-      const response = await api.post("/wallet/fund", { amount });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] });
-      showToast("Wallet funded successfully", "success");
-    },
-  });
-
-  return {
-    getBalance,
-    getTransactions,
-    fundWallet,
-  };
 };

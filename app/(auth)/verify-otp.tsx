@@ -99,7 +99,7 @@ export default function VerifyOtpScreen() {
         {
           onSuccess: (data) => {
             login(data.token, data.user, false);
-            router.replace("/(tabs)");
+            router.replace("/home");
           },
           onError: (err: any) => {
             Toast.show({

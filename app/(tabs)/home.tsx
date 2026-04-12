@@ -1,551 +1,377 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
+  Text,
   ScrollView,
   TouchableOpacity,
-  Image,
-  Pressable,
-  Platform,
+  RefreshControl,
+  Dimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import {
+  Wallet,
+  Bell,
+  ShieldCheck,
+  Lock,
+  Plus,
+  Upload,
+  ShoppingBag,
+  ArrowRight,
+  TrendingUp,
+} from "lucide-react-native";
 import { useRouter } from "expo-router";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { Screen } from "@/components/ui/Screen";
-import { Typography } from "@/components/ui/Typography";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/context/AuthContext";
+import { useWalletBalance } from "@/lib/hooks/useWallet";
+import { useEscrowList } from "@/lib/hooks/useEscrow";
+import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import {
+  TransactionRow,
+  TransactionType,
+} from "@/components/ui/TransactionRow";
+import { EscrowProgressBar } from "@/components/ui/EscrowProgressBar";
+import { Avatar } from "@/components/ui/Avatar";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+} from "react-native-reanimated";
 
-export default function DashboardScreen() {
-  const router = useRouter();
+const { width } = Dimensions.get("window");
+
+const BalanceSkeleton = () => {
+  const opacity = useSharedValue(0.3);
+
+  React.useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.7, { duration: 800 }),
+        withTiming(0.3, { duration: 800 }),
+      ),
+      -1,
+      true,
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
 
   return (
-    <Screen
-      rightAction={
-        <View className="flex-row items-center space-x-4">
-          <TouchableOpacity
-            style={{ width: 42, height: 42 }}
-            className="active:scale-95 transition-transform items-center justify-center bg-[#1C2026] rounded-xl border border-[#30363D]"
-          >
-            <MaterialCommunityIcons
-              name="bell-outline"
-              size={20}
-              color="#F5E642"
-            />
-          </TouchableOpacity>
-          <View
-            style={{ width: 42, height: 42 }}
-            className="rounded-xl overflow-hidden border border-[#30363D]"
-          >
-            <Image
-              source={{
-                uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuBis5kg049aet7S4bj7DM7u_Lnud1Y1gjDZQgiZevnzB7ODvpcMb5J3dzwf_A5hGP903iI3UkfJEtniLmglaYs6xwSmHRoAnobl6mtYU4Gc2MZIab7Xms-zr7HvwMPAtiNfnx2SODUWkS5IfBde7dbW5wOFSsTfouPW-qB9rCZodKJwxMgoyEl3ipEIdXi-8v1B3jp5T7ZzicYjtAQZxyNvvU1H879aJwyq8T4u9NbvvkCJVeBTNygHkutoX1G8QcQ--A12GGFHYRif",
-              }}
-              className="w-full h-full"
-            />
+    <Animated.View
+      style={animatedStyle}
+      className="h-12 w-48 bg-[#30363D] rounded-lg mb-2"
+    />
+  );
+};
+
+export default function HomeScreen() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const {
+    data: balance,
+    isLoading: isBalanceLoading,
+    refetch: refetchBalance,
+  } = useWalletBalance();
+  const {
+    data: escrows,
+    isLoading: isEscrowsLoading,
+    refetch: refetchEscrows,
+  } = useEscrowList();
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([refetchBalance(), refetchEscrows()]);
+    setRefreshing(false);
+  }, [refetchBalance, refetchEscrows]);
+
+  useRefreshOnFocus(refetchBalance);
+  useRefreshOnFocus(refetchEscrows);
+
+  const activeEscrows = escrows?.filter((e) => e.status !== "released") || [];
+  const recentEscrows = (escrows || []).slice(0, 5);
+
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case "delivery_marked":
+        return { label: "AWAITING DELIVERY", color: "bg-[#F5E642]" };
+      case "funded":
+        return { label: "FUNDED", color: "bg-blue-500" };
+      case "disputed":
+        return { label: "DISPUTED", color: "bg-[#FF4D4F]" };
+      case "released":
+        return { label: "RELEASED", color: "bg-[#00C896]" };
+      default:
+        return { label: status.toUpperCase(), color: "bg-[#30363D]" };
+    }
+  };
+
+  return (
+    <SafeAreaView className="flex-1 bg-[#0D1117]">
+      <StatusBar style="light" />
+
+      {/* HEADER */}
+      <View className="px-6 py-4 flex-row justify-between items-center bg-[#0D1117]">
+        <View className="flex-row items-center">
+          <View className="w-8 h-8 rounded-full bg-accent-primary items-center justify-center mr-2">
+            <Text className="text-[#0D1117] font-inter-bold text-lg">C</Text>
           </View>
+          <Text className="text-white font-inter-bold text-xl">LemonPay</Text>
         </View>
-      }
-    >
-      <View className="flex-row items-center py-4 mb-2" style={{ gap: 12 }}>
-        <View
-          className="items-center justify-center bg-[#F5E642] rounded-xl"
-          style={{
-            width: 40,
-            height: 40,
-            shadowColor: "#F5E642",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
-        >
-          <MaterialCommunityIcons
-            name="shield-check"
-            size={20}
-            color="#1f1c00"
+        <View className="flex-row items-center gap-x-4">
+          <TouchableOpacity className="w-10 h-10 items-center justify-center">
+            <Bell size={24} color="white" />
+          </TouchableOpacity>
+          <Avatar
+            name={`${user?.first_name} ${user?.last_name}`}
+            size="sm"
+            className="rounded-lg border-0"
           />
-        </View>
-        <View>
-          <Typography
-            variant="heading"
-            className="text-white leading-tight"
-            weight="700"
-          >
-            LemonPay
-          </Typography>
-          <Typography variant="caption" className="text-[#8B949E]" weight="500">
-            Escrow Secured
-          </Typography>
         </View>
       </View>
 
       <ScrollView
+        className="flex-1 px-6"
         showsVerticalScrollIndicator={false}
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#F5E642"
+          />
+        }
       >
-        <View className="py-4" style={{ gap: 32 }}>
-          {/* Hero Balance Card */}
-          <View style={{ gap: 16 }}>
-            <Card
-              variant="high"
-              radius="xl"
-              className="p-8 relative overflow-hidden"
-              style={{ padding: 32 }}
+        {/* WALLET BALANCE CARD */}
+        <View className="bg-[#161B22] rounded-xl p-5 mt-4">
+          <View className="flex-row items-center mb-2">
+            <Wallet size={12} color="#8B949E" />
+            <Text className="text-[#8B949E] font-inter-bold text-[10px] ml-2 tracking-widest uppercase">
+              TOTAL WALLET BALANCE
+            </Text>
+          </View>
+
+          {isBalanceLoading ? (
+            <BalanceSkeleton />
+          ) : (
+            <Text className="text-white font-inter-extrabold text-4xl mb-1">
+              ₦
+              {balance?.balance.toLocaleString("en-NG", {
+                minimumFractionDigits: 1,
+              })}
+            </Text>
+          )}
+
+          <View className="flex-row items-center mb-6">
+            <TrendingUp size={14} color="#00C896" />
+            <Text className="text-[#00C896] font-inter-medium text-xs ml-1">
+              +2.4% this month
+            </Text>
+          </View>
+
+          <View className="flex-row gap-x-3">
+            <TouchableOpacity
+              className="flex-1 h-12 rounded-full overflow-hidden"
+              onPress={() => router.push("/wallet")}
             >
+              <LinearGradient
+                colors={["#F5E642", "#D4C200"]}
+                className="flex-1 flex-row items-center justify-center"
+              >
+                <Plus size={18} color="#0D1117" />
+                <Text className="text-[#0D1117] font-inter-bold text-sm ml-2">
+                  Fund Wallet
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity className="flex-1 h-12 rounded-full bg-[#21262D] border border-[#30363D] flex-row items-center justify-center">
+              <Upload size={18} color="white" />
+              <Text className="text-white font-inter-bold text-sm ml-2">
+                Withdraw
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ESCROW STATS CARD */}
+        <View className="bg-[#161B22] rounded-xl p-5 mt-4 flex-row items-center">
+          <View className="flex-1">
+            <View className="flex-row items-center mb-1">
+              <ShieldCheck size={20} color="#00C896" />
+              <Text className="text-[#8B949E] font-inter-medium text-xs ml-2">
+                Escrow Success Rate
+              </Text>
+            </View>
+            <Text className="text-white font-inter-bold text-2xl">99.8%</Text>
+            <View className="flex-row items-center mt-2">
+              <Lock size={12} color="#8B949E" />
+              <Text className="text-[#8B949E] font-inter text-[10px] ml-1 uppercase">
+                Secure by LemonPay Guard
+              </Text>
+            </View>
+          </View>
+          <View className="bg-[#00C896]/20 px-3 py-1 rounded-full">
+            <Text className="text-[#00C896] font-inter-bold text-[10px] tracking-widest uppercase">
+              GOLD TIER
+            </Text>
+          </View>
+        </View>
+
+        {/* ACTIVE ESCROWS SECTION */}
+        <View className="mt-8">
+          <SectionHeader
+            title="Active Escrows"
+            subtitle={`You have ${activeEscrows.length} ongoing contracts`}
+            actionLabel="View All →"
+            onAction={() => router.push("/(tabs)/escrows")}
+          />
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="-mx-6 px-6"
+            snapToInterval={width - 48 + 12}
+            decelerationRate="fast"
+          >
+            {activeEscrows.length > 0 ? (
+              activeEscrows.slice(0, 2).map((escrow) => {
+                const statusInfo = getStatusInfo(escrow.status);
+                return (
+                  <TouchableOpacity
+                    key={escrow.id}
+                    className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 mr-3"
+                    style={{ width: width - 80 }}
+                  >
+                    <View className="flex-row justify-between items-start mb-4">
+                      <View className="w-10 h-10 bg-[#0D1117] rounded-lg items-center justify-center">
+                        <ShoppingBag size={20} color="white" />
+                      </View>
+                      <View className={`${statusInfo.color} px-2 py-1 rounded`}>
+                        <Text className="text-[#0D1117] font-inter-bold text-[8px] tracking-widest uppercase">
+                          {statusInfo.label}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text
+                      className="text-white font-inter-bold text-lg"
+                      numberOfLines={1}
+                    >
+                      {escrow.title}
+                    </Text>
+                    <Text className="text-[#8B949E] font-inter text-sm mb-4">
+                      @{escrow.seller?.first_name || "Merchant"}
+                    </Text>
+
+                    <EscrowProgressBar status={escrow.status} />
+
+                    <View className="flex-row justify-between items-center mt-6">
+                      <Text className="text-white font-inter-bold text-xl">
+                        ₦{parseFloat(escrow.amount).toLocaleString("en-NG")}
+                      </Text>
+                      <Text className="text-[#8B949E] font-inter text-xs">
+                        Ends in 3 days
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
               <View
-                className="absolute top-[-40px] right-[-40px] w-64 h-64 bg-[#F5E642] opacity-10 rounded-full"
-                style={{
-                  backgroundColor: "#F5E642",
-                  transform: [{ scale: 1.5 }],
-                  // Note: Blur is tricky on native View, normally used with BlurView but here we use opacity
-                }}
-              />
-
-              <View className="z-10" style={{ gap: 32 }}>
-                <View>
-                  <View
-                    className="flex-row items-center mb-3"
-                    style={{ gap: 8 }}
-                  >
-                    <View className="p-2 bg-[#F5E642] opacity-10 rounded-lg">
-                      <MaterialCommunityIcons
-                        name="wallet"
-                        size={14}
-                        color="#F5E642"
-                      />
-                    </View>
-                    <Typography
-                      variant="label"
-                      className="text-[#8B949E]"
-                      weight="600"
-                    >
-                      Total Wallet Balance
-                    </Typography>
-                  </View>
-                  <Typography
-                    variant="display-lg"
-                    className="text-white mb-2"
-                    weight="800"
-                    style={{ fontSize: 48 }}
-                  >
-                    ₦ 12,450,000
-                  </Typography>
-                  <View
-                    className="flex-row items-center self-start px-3 py-1 rounded-full bg-[#43e5b1] bg-opacity-10"
-                    style={{ gap: 8 }}
-                  >
-                    <MaterialCommunityIcons
-                      name="trending-up"
-                      size={12}
-                      color="#43e5b1"
-                    />
-                    <Typography
-                      variant="caption"
-                      className="text-[#43e5b1]"
-                      weight="700"
-                    >
-                      +2.4% this month
-                    </Typography>
-                  </View>
-                </View>
-
-                <View className="flex-row" style={{ gap: 12 }}>
-                  <View className="flex-1">
-                    <Button
-                      label="Fund"
-                      onPress={() => router.push("/wallet/fund")}
-                      leftIcon={
-                        <MaterialCommunityIcons
-                          name="plus-circle"
-                          size={20}
-                          color="#1F1C00"
-                        />
-                      }
-                    />
-                  </View>
-
-                  <View className="flex-1">
-                    <Button
-                      label="Withdraw"
-                      variant="secondary"
-                      onPress={() => {}}
-                      leftIcon={
-                        <MaterialCommunityIcons
-                          name="upload"
-                          size={20}
-                          color="#ffffff"
-                        />
-                      }
-                      className="bg-[#1C2026]"
-                    />
-                  </View>
-                </View>
-              </View>
-            </Card>
-
-            <View className="flex-row" style={{ gap: 16 }}>
-              <Card variant="low" className="flex-1 p-6" radius="lg">
-                <View
-                  className="w-10 h-10 rounded-xl bg-[#43e5b1] opacity-10 items-center justify-center mb-4"
-                  style={{ backgroundColor: "rgba(67, 229, 177, 0.1)" }}
-                >
-                  <MaterialCommunityIcons
-                    name="check-decagram"
-                    size={20}
-                    color="#43e5b1"
-                  />
-                </View>
-                <Typography variant="caption" className="text-[#8B949E] mb-1">
-                  Success Rate
-                </Typography>
-                <Typography
-                  variant="heading"
-                  className="text-2xl text-white"
-                  weight="700"
-                >
-                  99.8%
-                </Typography>
-              </Card>
-
-              <Card variant="low" className="flex-1 p-6" radius="lg">
-                <View
-                  className="w-10 h-10 rounded-xl bg-[#F5E642] opacity-10 items-center justify-center mb-4"
-                  style={{ backgroundColor: "rgba(245, 230, 66, 0.1)" }}
-                >
-                  <MaterialCommunityIcons
-                    name="lock"
-                    size={20}
-                    color="#F5E642"
-                  />
-                </View>
-                <Typography variant="caption" className="text-[#8B949E] mb-1">
-                  Security Status
-                </Typography>
-                <Typography
-                  variant="heading"
-                  className="text-2xl text-white"
-                  weight="700"
-                >
-                  Active
-                </Typography>
-              </Card>
-            </View>
-          </View>
-
-          {/* Active Escrows Section */}
-          <View>
-            <View className="flex-row justify-between items-center mb-6 px-1">
-              <View>
-                <Typography variant="heading" weight="700">
-                  Active Escrows
-                </Typography>
-                <Typography variant="caption" className="text-[#8B949E]">
-                  3 ongoing contracts
-                </Typography>
-              </View>
-              <TouchableOpacity
-                onPress={() => router.push("/transactions")}
-                className="bg-[#1C2026] px-4 py-2 rounded-xl flex-row items-center border border-[#30363D]"
-                style={{ gap: 4 }}
+                className="bg-[#161B22] rounded-xl border border-[#30363D] p-10 items-center justify-center mr-3"
+                style={{ width: width - 80 }}
               >
-                <Typography
-                  variant="label"
-                  className="text-[#F5E642]"
-                  weight="700"
-                >
-                  Details
-                </Typography>
-                <MaterialCommunityIcons
-                  name="arrow-right"
-                  size={14}
-                  color="#F5E642"
-                />
-              </TouchableOpacity>
-            </View>
+                <ShoppingBag size={32} color="#30363D" />
+                <Text className="text-[#8B949E] font-inter-medium text-center mt-2">
+                  No active escrows
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingRight: 24, gap: 16 }}
-            >
-              {[
-                {
-                  title: "MacBook Pro M2 Max",
-                  vendor: "@tech_hub_ng",
-                  amount: "₦ 2,850,000",
-                  status: "Awaiting Delivery",
-                  progress: 65,
-                  timeLeft: "2 days left",
-                  icon: (
-                    <MaterialCommunityIcons
-                      name="shopping"
-                      size={20}
-                      color="#F5E642"
+        {/* RECENT TRANSACTIONS SECTION */}
+        <View className="mt-8 mb-24">
+          <SectionHeader title="Recent Transactions" />
+          <View className="bg-[#161B22] rounded-xl px-5">
+            {recentEscrows.length > 0 ? (
+              recentEscrows.map((escrow, index) => {
+                const isReleased = escrow.status === "released";
+                const isDisputed = escrow.status === "disputed";
+                const isFunded = escrow.status === "funded";
+
+                let type: TransactionType = "funded";
+                let statusLabel = "PENDING INSPECTION";
+                let statusColor: "success" | "pending" | "danger" = "pending";
+
+                if (isReleased) {
+                  type = "released";
+                  statusLabel = "COMPLETED";
+                  statusColor = "success";
+                } else if (isDisputed) {
+                  type = "disputed";
+                  statusLabel = "IN RESOLUTION";
+                  statusColor = "danger";
+                }
+
+                return (
+                  <View key={escrow.id}>
+                    <TransactionRow
+                      type={type}
+                      title={isReleased ? "Escrow Released" : escrow.title}
+                      subtitle={`Contract #LP-${escrow.uuid.substring(
+                        0,
+                        4,
+                      )} • 2 hours ago`}
+                      amount={parseFloat(escrow.amount)}
+                      isCredit={isReleased}
+                      status={statusLabel}
+                      statusColor={statusColor}
                     />
-                  ),
-                },
-                {
-                  title: "Design Project",
-                  vendor: "@global_fintech",
-                  amount: "₦ 450,000",
-                  status: "Milestone 1/3",
-                  progress: 33,
-                  timeLeft: "Ongoing",
-                  icon: (
-                    <MaterialCommunityIcons
-                      name="home"
-                      size={20}
-                      color="#F5E642"
-                    />
-                  ),
-                },
-              ].map((escrow, idx) => (
-                <Card
-                  key={idx}
-                  variant="default"
-                  radius="xl"
-                  className="w-[300px] p-6"
-                  style={{ backgroundColor: "#161B22" }}
-                >
-                  <View className="flex-row justify-between items-start mb-6">
-                    <View className="p-3 bg-[#1C2026] rounded-2xl border border-[#30363D]">
-                      {escrow.icon}
-                    </View>
-                    <View className="bg-[#F5E642] bg-opacity-10 px-3 py-1 rounded-full border border-[#F5E642] border-opacity-20">
-                      <Typography
-                        variant="label-sm"
-                        className="text-[#F5E642]"
-                        weight="800"
-                      >
-                        {escrow.status}
-                      </Typography>
-                    </View>
+                    {index < recentEscrows.length - 1 && (
+                      <View className="h-[1px] bg-[#30363D]" />
+                    )}
                   </View>
-                  <Typography
-                    variant="subheading"
-                    weight="700"
-                    className="mb-1 text-white"
-                  >
-                    {escrow.title}
-                  </Typography>
-                  <Typography variant="caption" className="text-[#8B949E] mb-6">
-                    Vendor: {escrow.vendor}
-                  </Typography>
-
-                  <View className="mb-6" style={{ gap: 12 }}>
-                    <View className="w-full bg-[#1C2026] rounded-full h-1.5 overflow-hidden">
-                      <View
-                        className="bg-[#43e5b1] h-full rounded-full"
-                        style={{ width: `${escrow.progress}%` }}
-                      />
-                    </View>
-                    <View className="flex-row justify-between">
-                      <Typography variant="label-sm" className="text-[#8B949E]">
-                        Progress
-                      </Typography>
-                      <Typography variant="label-sm" className="text-white">
-                        {escrow.progress}%
-                      </Typography>
-                    </View>
-                  </View>
-
-                  <View className="flex-row justify-between items-center bg-[#1C2026] p-4 rounded-2xl border border-[#30363D]">
-                    <Typography
-                      variant="subheading"
-                      weight="700"
-                      className="text-white"
-                    >
-                      {escrow.amount}
-                    </Typography>
-                    <Typography variant="caption" className="text-[#8B949E]">
-                      {escrow.timeLeft}
-                    </Typography>
-                  </View>
-                </Card>
-              ))}
-
-              <TouchableOpacity>
-                <Card
-                  variant="low"
-                  radius="xl"
-                  className="w-[200px] items-center justify-center bg-transparent"
-                  style={{
-                    borderStyle: "dashed",
-                    borderWidth: 2,
-                    borderColor: "#30363D",
-                  }}
-                >
-                  <View className="w-12 h-12 rounded-full bg-[#1C2026] items-center justify-center mb-4 border border-[#30363D]">
-                    <MaterialCommunityIcons
-                      name="plus"
-                      size={24}
-                      color="#F5E642"
-                    />
-                  </View>
-                  <Typography
-                    variant="label"
-                    weight="700"
-                    className="text-center text-white"
-                  >
-                    New Escrow
-                  </Typography>
-                </Card>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-
-          {/* Recent Transactions Section */}
-          <View style={{ gap: 16 }}>
-            <View className="flex-row justify-between items-center px-1">
-              <Typography variant="heading" weight="700">
-                Recent Transactions
-              </Typography>
-              <TouchableOpacity>
-                <Typography
-                  variant="label"
-                  className="text-[#8B949E]"
-                  weight="600"
-                >
-                  See All
-                </Typography>
-              </TouchableOpacity>
-            </View>
-
-            <Card variant="low" radius="xl" className="p-0 overflow-hidden">
-              {[
-                {
-                  title: "Escrow Released",
-                  sub: "Contract #LP-9021 • 2h ago",
-                  amount: "+ ₦ 120,000.00",
-                  status: "Completed",
-                  icon: (
-                    <MaterialCommunityIcons
-                      name="check-circle"
-                      size={24}
-                      color="#43e5b1"
-                    />
-                  ),
-                  color: "text-[#43e5b1]",
-                },
-                {
-                  title: "Escrow Funded",
-                  sub: "Contract #LP-9025 • Oct 12",
-                  amount: "- ₦ 2,850,000.00",
-                  status: "In Progress",
-                  icon: (
-                    <MaterialCommunityIcons
-                      name="timer-sand"
-                      size={24}
-                      color="#F5E642"
-                    />
-                  ),
-                  color: "text-white",
-                },
-                {
-                  title: "Escrow Disputed",
-                  sub: "Contract #LP-8842 • Oct 10",
-                  amount: "₦ 15,000.00",
-                  status: "Resolution",
-                  icon: (
-                    <MaterialCommunityIcons
-                      name="gavel"
-                      size={24}
-                      color="#FFB4AB"
-                    />
-                  ),
-                  color: "text-[#FFB4AB]",
-                },
-              ].map((item, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => router.push(`/transactions/LP-${i + 7000}`)}
-                  className={`flex-row items-center justify-between p-6 active:bg-[#1C2026] ${i > 0 ? "border-t border-[#30363D]" : ""}`}
-                >
-                  <View className="flex-row items-center" style={{ gap: 16 }}>
-                    <View className="w-12 h-12 rounded-2xl bg-[#1C2026] items-center justify-center border border-[#30363D]">
-                      {item.icon}
-                    </View>
-                    <View>
-                      <Typography
-                        variant="body"
-                        weight="700"
-                        className="text-white"
-                      >
-                        {item.title}
-                      </Typography>
-                      <Typography variant="caption" className="text-[#8B949E]">
-                        {item.sub}
-                      </Typography>
-                    </View>
-                  </View>
-                  <View className="items-end">
-                    <Typography
-                      variant="body"
-                      weight="800"
-                      className={`${item.color}`}
-                    >
-                      {item.amount}
-                    </Typography>
-                    <Typography
-                      variant="label-sm"
-                      className={`text-[8px] ${item.color} uppercase opacity-80`}
-                      weight="800"
-                    >
-                      {item.status}
-                    </Typography>
-                  </View>
-                </Pressable>
-              ))}
-            </Card>
-          </View>
-
-          {/* Trust Signal */}
-          <View className="items-center py-4">
-            <View
-              className="flex-row items-center px-6 py-3 rounded-full bg-[#1C2026] border border-[#30363D]"
-              style={{ gap: 8 }}
-            >
-              <MaterialCommunityIcons
-                name="check-decagram"
-                size={14}
-                color="#F5E642"
-              />
-              <Typography
-                variant="label-sm"
-                className="text-[#8B949E] tracking-[0.1em]"
-                weight="600"
-              >
-                SECURE BY LEMONPAY GUARD
-              </Typography>
-            </View>
+                );
+              })
+            ) : (
+              <View className="py-10 items-center">
+                <Text className="text-[#8B949E] font-inter">
+                  No transactions yet
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity
-        onPress={() => router.push("/wallet/fund")}
-        style={{
-          bottom: 30,
-          right: 24,
-          width: 64,
-          height: 64,
-          borderRadius: 20,
-          backgroundColor: "#F5E642",
-          shadowColor: "#F5E642",
-          shadowOffset: { width: 0, height: 10 },
-          shadowOpacity: 0.4,
-          shadowRadius: 15,
-          elevation: 10,
-          position: "absolute",
-          zIndex: 50,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        className="active:scale-95 transition-transform"
+      {/* SECURITY FOOTER BAR */}
+      <View
+        className="absolute bottom-0 left-0 right-0 bg-[#0D1117] py-3 items-center"
+        style={{ bottom: 0 }}
       >
-        <MaterialCommunityIcons name="plus" size={32} color="#1f1c00" />
+        <View className="flex-row items-center border-t border-[#30363D] w-full justify-center pt-3">
+          <ShieldCheck size={12} color="#8B949E" />
+          <Text className="text-[#8B949E] font-inter-bold text-[8px] ml-1 tracking-widest uppercase">
+            SECURE BY LEMONPAY GUARD V2.4
+          </Text>
+        </View>
+      </View>
+
+      {/* FLOATING ACTION BUTTON */}
+      <TouchableOpacity
+        className="absolute bottom-20 right-6 w-14 h-14 rounded-full bg-accent-primary items-center justify-center shadow-lg"
+        style={{ elevation: 5 }}
+        onPress={() => router.push("/escrow/create")}
+      >
+        <Plus size={32} color="#0D1117" />
       </TouchableOpacity>
-    </Screen>
+    </SafeAreaView>
   );
 }

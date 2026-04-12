@@ -1,57 +1,29 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "../api";
-import { useEscrowStore, EscrowStatus } from "../../store/useEscrowStore";
-import { useToastStore } from "../../store/useToastStore";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "../api/client";
+import { ENDPOINTS } from "../api/endpoints";
+import { Escrow, ApiResponse } from "@/types/api";
 
-export const useEscrow = () => {
-  const queryClient = useQueryClient();
-  const { setEscrows, setActiveEscrow } = useEscrowStore();
-  const { show: showToast } = useToastStore();
-
-  const getEscrows = useQuery({
+export const useEscrowList = () => {
+  return useQuery<Escrow[]>({
     queryKey: ["escrows"],
     queryFn: async () => {
-      const response = await api.get("/escrows");
-      setEscrows(response.data);
-      return response.data;
+      const response = await apiClient.get<ApiResponse<Escrow[]>>(
+        ENDPOINTS.ESCROW.LIST,
+      );
+      return response.data.data;
     },
+    staleTime: 60000,
   });
+};
 
-  const createEscrow = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await api.post("/escrows", data);
-      return response.data;
+export const useEscrowDetail = (id: number) => {
+  return useQuery<Escrow>({
+    queryKey: ["escrow", id],
+    queryFn: async () => {
+      const url = ENDPOINTS.ESCROW.DETAIL.replace(":id", id.toString());
+      const response = await apiClient.get<ApiResponse<Escrow>>(url);
+      return response.data.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["escrows"] });
-      showToast("Escrow created successfully", "success");
-    },
-    onError: (error: any) => {
-      showToast(error.message || "Failed to create escrow", "error");
-    },
+    enabled: !!id,
   });
-
-  const updateStatus = useMutation({
-    mutationFn: async ({
-      id,
-      status,
-    }: {
-      id: string;
-      status: EscrowStatus;
-    }) => {
-      const response = await api.patch(`/escrows/${id}/status`, { status });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["escrows"] });
-      setActiveEscrow(data);
-      showToast("Status updated", "success");
-    },
-  });
-
-  return {
-    getEscrows,
-    createEscrow,
-    updateStatus,
-  };
 };
