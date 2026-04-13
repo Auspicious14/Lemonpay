@@ -1,60 +1,43 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  TextInput,
-  StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
 import {
   Bell,
   Wallet as WalletIcon,
   ShieldCheck,
   Lock,
-  Plus,
-  ArrowUpRight,
   TrendingUp,
   Key,
   CheckCircle2,
 } from "lucide-react-native";
-import BottomSheet from "@gorhom/bottom-sheet";
 import { useAuth } from "@/context/AuthContext";
-import { useWalletBalance, useFundWallet } from "@/lib/hooks/useWallet";
+import { useWalletBalance } from "@/lib/hooks/useWallet";
 import { useEscrowList } from "@/lib/hooks/useEscrow";
 import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { TransactionRow } from "@/components/ui/TransactionRow";
 import { Avatar } from "@/components/ui/Avatar";
 import { LinearGradient } from "expo-linear-gradient";
-import { CustomBottomSheet } from "@/components/ui/BottomSheet";
-import { Button } from "@/components/ui/Button";
 import { useToastStore } from "@/store/useToastStore";
 
-const QUICK_AMOUNTS = [5000, 10000, 50000, 100000];
-
 export default function WalletScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const { show: showToast } = useToastStore();
-  const {
-    data: balance,
-    isLoading: isBalanceLoading,
-    refetch: refetchBalance,
-  } = useWalletBalance();
-  const {
-    data: escrows,
-    isLoading: isEscrowsLoading,
-    refetch: refetchEscrows,
-  } = useEscrowList();
 
-  const fundWalletMutation = useFundWallet();
+  const { data: balance, refetch: refetchBalance } = useWalletBalance();
+
+  const { data: escrows, refetch: refetchEscrows } = useEscrowList();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [fundAmount, setFundAmount] = useState("");
-  const bottomSheetRef = useRef<BottomSheet>(null);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -62,27 +45,9 @@ export default function WalletScreen() {
     setRefreshing(false);
   }, [refetchBalance, refetchEscrows]);
 
+  // Refetch data when screen comes into focus
   useRefreshOnFocus(refetchBalance);
   useRefreshOnFocus(refetchEscrows);
-
-  const handleFundWallet = async () => {
-    const amount = parseFloat(fundAmount);
-    if (isNaN(amount) || amount <= 0) {
-      showToast("Please enter a valid amount", "error");
-      return;
-    }
-
-    try {
-      await fundWalletMutation.mutateAsync({
-        amount,
-        email: user?.email || "",
-      });
-      bottomSheetRef.current?.close();
-      setFundAmount("");
-    } catch (error: any) {
-      showToast(error.message || "Failed to initiate funding", "error");
-    }
-  };
 
   const recentTransactions = (escrows || []).slice(0, 10);
 
@@ -149,7 +114,7 @@ export default function WalletScreen() {
 
           <TouchableOpacity
             className="h-14 rounded-2xl overflow-hidden mb-4"
-            onPress={() => bottomSheetRef.current?.expand()}
+            onPress={() => router.push("/wallet/fund")}
           >
             <LinearGradient
               colors={["#F5E642", "#D4C200"]}
@@ -161,9 +126,7 @@ export default function WalletScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => showToast("Withdrawal coming soon", "info")}
-          >
+          <TouchableOpacity onPress={() => router.push("/wallet/withdraw")}>
             <Text className="text-white font-inter-bold text-sm text-center">
               Withdraw
             </Text>
@@ -290,66 +253,6 @@ export default function WalletScreen() {
           </View>
         </View>
       </ScrollView>
-
-      {/* FUND WALLET BOTTOM SHEET */}
-      <CustomBottomSheet
-        ref={bottomSheetRef}
-        title="Fund Wallet"
-        snapPoints={["60%"]}
-      >
-        <View className="flex-1">
-          <Text className="text-[#8B949E] font-inter-medium text-sm mb-4">
-            Enter the amount you wish to add to your LemonPay wallet.
-          </Text>
-
-          <View className="flex-row items-center bg-[#0D1117] border border-[#30363D] rounded-2xl h-16 px-5 mb-6">
-            <Text className="text-white font-inter-bold text-2xl mr-2">₦</Text>
-            <TextInput
-              className="flex-1 text-white font-inter-bold text-2xl"
-              placeholder="0.00"
-              placeholderTextColor="#30363D"
-              keyboardType="numeric"
-              value={fundAmount}
-              onChangeText={setFundAmount}
-            />
-          </View>
-
-          <View className="flex-row flex-wrap gap-2 mb-8">
-            {QUICK_AMOUNTS.map((amt) => (
-              <TouchableOpacity
-                key={amt}
-                onPress={() => setFundAmount(amt.toString())}
-                className={`px-4 py-2 rounded-full border ${
-                  fundAmount === amt.toString()
-                    ? "bg-accent-primary/20 border-accent-primary"
-                    : "bg-transparent border-[#30363D]"
-                }`}
-              >
-                <Text
-                  className={`font-inter-semibold text-xs ${
-                    fundAmount === amt.toString()
-                      ? "text-accent-primary"
-                      : "text-[#8B949E]"
-                  }`}
-                >
-                  ₦{amt.toLocaleString()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Button
-            label={
-              fundWalletMutation.isPending
-                ? "Processing..."
-                : "Proceed to Payment"
-            }
-            onPress={handleFundWallet}
-            loading={fundWalletMutation.isPending}
-            className="mt-auto"
-          />
-        </View>
-      </CustomBottomSheet>
     </SafeAreaView>
   );
 }

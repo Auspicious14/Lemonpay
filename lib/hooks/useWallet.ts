@@ -29,16 +29,14 @@ export const useFundWallet = () => {
     mutationFn: async ({ amount, email }: FundWalletParams) => {
       const response = await apiClient.post<ApiResponse<FundWalletResponse>>(
         ENDPOINTS.WALLET.FUND,
-        { amount, email },
+        { amount: amount.toString(), email },
       );
       return response.data.data;
     },
-    onSuccess: async (data) => {
-      if (data.authorization_url) {
-        await WebBrowser.openAuthSessionAsync(data.authorization_url);
-        // After browser closes, refetch balance
-        queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
-      }
+    onSuccess: () => {
+      // Invalidate balance queries after successful initiation
+      // though actual credit happens via webhook asynchronously
+      queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
     },
   });
 };
