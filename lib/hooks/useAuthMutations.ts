@@ -33,6 +33,7 @@ export const useRequestOtp = () => {
 };
 
 export const useRegister = () => {
+  const { login } = useAuth();
   return useMutation({
     mutationFn: async (data: {
       email: string;
@@ -49,6 +50,9 @@ export const useRegister = () => {
       );
       console.log("[AUTH] Register Success Response:", response.data);
       return response.data.data;
+    },
+    onSuccess: (data) => {
+      login(data.token, data.user, true);
     },
   });
 };

@@ -26,11 +26,14 @@ SplashScreenNative.preventAutoHideAsync();
 function AppContent() {
   const { isLoading, hasPinSetup } = useAuth();
   const [fontsLoaded, fontError] = useFonts({
-    "Inter-Regular": Inter_400Regular,
-    "Inter-Medium": Inter_500Medium,
-    "Inter-SemiBold": Inter_600SemiBold,
-    "Inter-Bold": Inter_700Bold,
-    "Inter-ExtraBold": Inter_800ExtraBold,
+    'Inter': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+    'Inter-Bold': Inter_700Bold,
+    'Inter-ExtraBold': Inter_800ExtraBold,
+    'inter': Inter_400Regular,
+    'inter-medium': Inter_500Medium,
+    'inter-bold': Inter_700Bold,
   });
 
   useEffect(() => {

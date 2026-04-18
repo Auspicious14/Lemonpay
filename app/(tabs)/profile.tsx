@@ -28,6 +28,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Divider } from "@/components/ui/Divider";
 import { useToastStore } from "@/store/useToastStore";
+import { formatCurrency } from "@/lib/utils/format";
+import { useWalletBalance } from "@/lib/hooks/useWallet";
 
 const SectionLabel = ({ label }: { label: string }) => (
   <Text className="text-[#8B949E] font-inter-bold text-[10px] tracking-[2px] mb-3 uppercase">
@@ -39,6 +41,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { show: showToast } = useToastStore();
+  const { data: balance } = useWalletBalance();
 
   const [tfaEnabled, setTfaEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
@@ -92,7 +95,7 @@ export default function ProfileScreen() {
             <View className="absolute -bottom-2 self-center">
               <Badge
                 status="released"
-                label="TIER 3 VERIFIED"
+                label={user?.account_type === "seller" ? "VERIFIED SELLER" : "VERIFIED BUYER"}
                 className="bg-secondary-container rounded-full"
               />
             </View>
@@ -127,7 +130,7 @@ export default function ProfileScreen() {
                   PHONE NUMBER
                 </Text>
                 <Text className="text-white font-inter-medium text-base">
-                  {user?.phone_no || "+234 812 345 6789"}
+                  {user?.phone_no || "Not provided"}
                 </Text>
               </View>
               <Phone size={20} color="#8B949E" />
@@ -140,6 +143,14 @@ export default function ProfileScreen() {
           <SectionLabel label="ACCOUNT LIMITS" />
           <View className="bg-[#161B22] rounded-xl p-5">
             <Text className="text-accent-primary font-inter-bold text-[10px] uppercase mb-2">
+              WALLET BALANCE
+            </Text>
+            <View className="flex-row items-baseline mb-4">
+              <Text className="text-white font-inter-extrabold text-3xl">
+                {formatCurrency(balance?.balance || 0)}
+              </Text>
+            </View>
+            <Text className="text-accent-primary font-inter-bold text-[10px] uppercase mb-2">
               DAILY TRANSACTION LIMIT
             </Text>
             <View className="flex-row items-baseline mb-4">
@@ -151,10 +162,10 @@ export default function ProfileScreen() {
               </Text>
             </View>
             <View className="h-2 bg-[#0D1117] rounded-full overflow-hidden mb-2">
-              <View className="h-full bg-secondary-container w-[15%]" />
+              <View className="h-full bg-secondary-container w-[1%]" />
             </View>
             <Text className="text-[#8B949E] font-inter text-xs">
-              Used ₦750,000 today
+              Securely held in escrow
             </Text>
           </View>
         </View>
@@ -275,7 +286,7 @@ export default function ProfileScreen() {
           className="bg-[#21262D] border border-[#30363D] h-14 rounded-full items-center justify-center flex-row mb-12"
           onPress={handleLogout}
         >
-          <LogOut size={20} color="white" className="mr-3" />
+          <LogOut size={20} color="white" />
           <Text className="text-white font-inter-bold text-base ml-3">
             Logout Account
           </Text>

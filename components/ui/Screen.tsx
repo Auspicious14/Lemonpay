@@ -10,6 +10,7 @@ interface ScreenProps {
   children: React.ReactNode;
   title?: string;
   showBackButton?: boolean;
+  onBack?: () => void;
   rightAction?: React.ReactNode;
   className?: string;
   withPadding?: boolean;
@@ -19,6 +20,7 @@ export const Screen: React.FC<ScreenProps> = ({
   children,
   title,
   showBackButton = false,
+  onBack,
   rightAction,
   className = "",
   withPadding = true,
@@ -37,7 +39,7 @@ export const Screen: React.FC<ScreenProps> = ({
           <View className="flex-row items-center flex-1">
             {showBackButton && (
               <TouchableOpacity
-                onPress={() => router.back()}
+                onPress={onBack || (() => router.back())}
                 className="mr-4 w-10 h-10 items-center justify-center bg-[#1C2026] rounded-xl border border-[#30363D]"
               >
                 <MaterialCommunityIcons

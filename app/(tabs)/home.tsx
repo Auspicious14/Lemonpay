@@ -23,7 +23,8 @@ import {
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { useWalletBalance } from "@/lib/hooks/useWallet";
-import { useEscrowList } from "@/lib/hooks/useEscrow";
+import { useMyEscrows } from "@/lib/hooks/useEscrow";
+import { useTransactions } from "@/lib/hooks/useTransactions";
 import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import {
@@ -33,6 +34,8 @@ import {
 import { EscrowProgressBar } from "@/components/ui/EscrowProgressBar";
 import { Avatar } from "@/components/ui/Avatar";
 import { LinearGradient } from "expo-linear-gradient";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { getStatusBadgeInfo } from "@/lib/utils/escrow";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -78,38 +81,45 @@ export default function HomeScreen() {
     refetch: refetchBalance,
   } = useWalletBalance();
   const {
-    data: escrows,
+    data: escrowsData,
     isLoading: isEscrowsLoading,
     refetch: refetchEscrows,
-  } = useEscrowList();
+  } = useMyEscrows();
+  const {
+    data: transactionsData,
+    isLoading: isTransactionsLoading,
+    refetch: refetchTransactions,
+  } = useTransactions();
 
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refetchBalance(), refetchEscrows()]);
+    await Promise.all([refetchBalance(), refetchEscrows(), refetchTransactions()]);
     setRefreshing(false);
-  }, [refetchBalance, refetchEscrows]);
+  }, [refetchBalance, refetchEscrows, refetchTransactions]);
 
   useRefreshOnFocus(refetchBalance);
   useRefreshOnFocus(refetchEscrows);
+  useRefreshOnFocus(refetchTransactions);
 
-  const activeEscrows = escrows?.filter((e) => e.status !== "released") || [];
-  const recentEscrows = (escrows || []).slice(0, 5);
+  const activeEscrows = escrowsData?.data.filter((e) => e.is_active) || [];
+  const recentTransactions = (transactionsData?.data || []).slice(0, 5);
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case "delivery_marked":
-        return { label: "AWAITING DELIVERY", color: "bg-[#F5E642]" };
-      case "funded":
-        return { label: "FUNDED", color: "bg-blue-500" };
-      case "disputed":
-        return { label: "DISPUTED", color: "bg-[#FF4D4F]" };
-      case "released":
-        return { label: "RELEASED", color: "bg-[#00C896]" };
-      default:
-        return { label: status.toUpperCase(), color: "bg-[#30363D]" };
+  const getStatusInfo = (status: any) => {
+    const info = getStatusBadgeInfo(status);
+    let colorClass = "bg-[#30363D]";
+    
+    switch (info.color) {
+      case "amber": colorClass = "bg-[#F5E642]"; break;
+      case "blue": colorClass = "bg-blue-500"; break;
+      case "purple": colorClass = "bg-purple-500"; break;
+      case "yellow": colorClass = "bg-yellow-500"; break;
+      case "teal": colorClass = "bg-[#00C896]"; break;
+      case "red": colorClass = "bg-[#FF4D4F]"; break;
     }
+
+    return { label: info.label, color: colorClass };
   };
 
   return (
@@ -120,12 +130,17 @@ export default function HomeScreen() {
       <View className="px-6 py-4 flex-row justify-between items-center bg-[#0D1117]">
         <View className="flex-row items-center">
           <View className="w-8 h-8 rounded-full bg-accent-primary items-center justify-center mr-2">
-            <Text className="text-[#0D1117] font-inter-bold text-lg">C</Text>
+            <Text className="text-[#0D1117] font-inter-bold text-lg">
+              {user?.first_name?.charAt(0) || "L"}
+            </Text>
           </View>
           <Text className="text-white font-inter-bold text-xl">LemonPay</Text>
         </View>
         <View className="flex-row items-center gap-x-4">
-          <TouchableOpacity className="w-10 h-10 items-center justify-center">
+          <TouchableOpacity 
+            className="w-10 h-10 items-center justify-center"
+            onPress={() => router.push("/notifications")}
+          >
             <Bell size={24} color="white" />
           </TouchableOpacity>
           <Avatar
@@ -160,10 +175,7 @@ export default function HomeScreen() {
             <BalanceSkeleton />
           ) : (
             <Text className="text-white font-inter-extrabold text-4xl mb-1">
-              ₦
-              {balance?.balance.toLocaleString("en-NG", {
-                minimumFractionDigits: 1,
-              })}
+              {formatCurrency(balance?.balance || 0)}
             </Text>
           )}
 
@@ -177,7 +189,7 @@ export default function HomeScreen() {
           <View className="flex-row gap-x-3">
             <TouchableOpacity
               className="flex-1 h-12 rounded-full overflow-hidden"
-              onPress={() => router.push("/wallet")}
+              onPress={() => router.push("/wallet/fund")}
             >
               <LinearGradient
                 colors={["#F5E642", "#D4C200"]}
@@ -190,7 +202,10 @@ export default function HomeScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity className="flex-1 h-12 rounded-full bg-[#21262D] border border-[#30363D] flex-row items-center justify-center">
+            <TouchableOpacity 
+              className="flex-1 h-12 rounded-full bg-[#21262D] border border-[#30363D] flex-row items-center justify-center"
+              onPress={() => router.push("/wallet/withdraw")}
+            >
               <Upload size={18} color="white" />
               <Text className="text-white font-inter-bold text-sm ml-2">
                 Withdraw
@@ -239,7 +254,17 @@ export default function HomeScreen() {
             snapToInterval={width - 48 + 12}
             decelerationRate="fast"
           >
-            {activeEscrows.length > 0 ? (
+            {isEscrowsLoading ? (
+              <View className="flex-row gap-x-3">
+                {[1, 2].map((i) => (
+                  <View 
+                    key={i} 
+                    className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 mr-3"
+                    style={{ width: width - 80, height: 180 }}
+                  />
+                ))}
+              </View>
+            ) : activeEscrows.length > 0 ? (
               activeEscrows.slice(0, 2).map((escrow) => {
                 const statusInfo = getStatusInfo(escrow.status);
                 return (
@@ -247,6 +272,7 @@ export default function HomeScreen() {
                     key={escrow.id}
                     className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 mr-3"
                     style={{ width: width - 80 }}
+                    onPress={() => router.push(`/escrow/${escrow.id}`)}
                   >
                     <View className="flex-row justify-between items-start mb-4">
                       <View className="w-10 h-10 bg-[#0D1117] rounded-lg items-center justify-center">
@@ -266,17 +292,17 @@ export default function HomeScreen() {
                       {escrow.title}
                     </Text>
                     <Text className="text-[#8B949E] font-inter text-sm mb-4">
-                      @{escrow.seller?.first_name || "Merchant"}
+                      @{escrow.seller?.first_name || escrow.seller_identifier || "Merchant"}
                     </Text>
 
                     <EscrowProgressBar status={escrow.status} />
 
                     <View className="flex-row justify-between items-center mt-6">
                       <Text className="text-white font-inter-bold text-xl">
-                        ₦{parseFloat(escrow.amount).toLocaleString("en-NG")}
+                        {formatCurrency(escrow.amount)}
                       </Text>
                       <Text className="text-[#8B949E] font-inter text-xs">
-                        Ends in 3 days
+                        {formatDate(escrow.created_at)}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -300,41 +326,31 @@ export default function HomeScreen() {
         <View className="mt-8 mb-24">
           <SectionHeader title="Recent Transactions" />
           <View className="bg-[#161B22] rounded-xl px-5">
-            {recentEscrows.length > 0 ? (
-              recentEscrows.map((escrow, index) => {
-                const isReleased = escrow.status === "released";
-                const isDisputed = escrow.status === "disputed";
-                const isFunded = escrow.status === "funded";
-
+            {isTransactionsLoading ? (
+              <View className="py-10 items-center">
+                <Text className="text-[#8B949E] font-inter">Loading...</Text>
+              </View>
+            ) : recentTransactions.length > 0 ? (
+              recentTransactions.map((tx, index) => {
+                const isCredit = tx.type === "credit";
+                
                 let type: TransactionType = "funded";
-                let statusLabel = "PENDING INSPECTION";
-                let statusColor: "success" | "pending" | "danger" = "pending";
-
-                if (isReleased) {
-                  type = "released";
-                  statusLabel = "COMPLETED";
-                  statusColor = "success";
-                } else if (isDisputed) {
-                  type = "disputed";
-                  statusLabel = "IN RESOLUTION";
-                  statusColor = "danger";
-                }
+                if (tx.description.includes("Escrow released")) type = "released";
+                if (tx.description.includes("Withdrawal")) type = "disputed"; // Red color
+                if (tx.description.includes("Wallet fund")) type = "funded"; // Yellow color
 
                 return (
-                  <View key={escrow.id}>
+                  <View key={tx.id}>
                     <TransactionRow
                       type={type}
-                      title={isReleased ? "Escrow Released" : escrow.title}
-                      subtitle={`Contract #LP-${escrow.uuid.substring(
-                        0,
-                        4,
-                      )} • 2 hours ago`}
-                      amount={parseFloat(escrow.amount)}
-                      isCredit={isReleased}
-                      status={statusLabel}
-                      statusColor={statusColor}
+                      title={tx.description}
+                      subtitle={`${tx.reference.substring(0, 8)} • ${formatDate(tx.created_at)}`}
+                      amount={parseFloat(tx.amount)}
+                      isCredit={isCredit}
+                      status={tx.status.toUpperCase()}
+                      statusColor={tx.status === "completed" ? "success" : tx.status === "pending" ? "pending" : "danger"}
                     />
-                    {index < recentEscrows.length - 1 && (
+                    {index < recentTransactions.length - 1 && (
                       <View className="h-[1px] bg-[#30363D]" />
                     )}
                   </View>

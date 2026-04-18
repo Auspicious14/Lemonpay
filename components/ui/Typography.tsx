@@ -19,16 +19,26 @@ export interface TypographyProps extends TextProps {
   className?: string;
 }
 
+const variantFontFamily: Record<TypographyVariant, string> = {
+  "display-lg": "Inter-ExtraBold",
+  display: "Inter-ExtraBold",
+  heading: "Inter-Bold",
+  subheading: "Inter-SemiBold",
+  body: "Inter",
+  caption: "Inter",
+  label: "Inter-Medium",
+  "label-sm": "Inter-Bold",
+};
+
 const variantStyles: Record<TypographyVariant, string> = {
-  "display-lg":
-    "text-[56px] font-inter-extrabold leading-[60px] tracking-tighter",
-  display: "text-[32px] font-inter-extrabold leading-[38px] tracking-tighter",
-  heading: "text-[24px] font-inter-bold leading-[30px]",
-  subheading: "text-[18px] font-inter-semibold leading-[24px]",
-  body: "text-[15px] font-inter leading-[22px]",
-  caption: "text-[13px] font-inter leading-[18px]",
-  label: "text-[12px] font-inter-medium uppercase",
-  "label-sm": "text-[10px] font-inter-bold uppercase",
+  "display-lg": "text-[56px] leading-[60px] tracking-tighter",
+  display: "text-[32px] leading-[38px] tracking-tighter",
+  heading: "text-[24px] leading-[30px]",
+  subheading: "text-[18px] leading-[24px]",
+  body: "text-[15px] leading-[22px]",
+  caption: "text-[13px] leading-[18px]",
+  label: "text-[12px]",
+  "label-sm": "text-[10px]",
 };
 
 export const Typography: React.FC<TypographyProps> = ({
@@ -42,25 +52,25 @@ export const Typography: React.FC<TypographyProps> = ({
 }) => {
   const textColorClass = color || "text-white";
 
-  // Map weight to font-family if not already in variant
-  const weightClass =
-    weight === "800"
-      ? "font-inter-extrabold"
-      : weight === "700"
-        ? "font-inter-bold"
-        : weight === "600"
-          ? "font-inter-semibold"
-          : weight === "500"
-            ? "font-inter-medium"
-            : weight === "400"
-              ? "font-inter"
-              : "";
-
   return (
     <Text
-      className={`${variantStyles[variant]} ${textColorClass} ${weightClass} ${className || ""}`}
+      className={`${variantStyles[variant]} ${textColorClass} ${className || ""}`}
       style={[
-        { letterSpacing: variant.startsWith("label") ? 0.5 : undefined },
+        { fontFamily: variantFontFamily[variant] },
+        weight === "800"
+          ? { fontFamily: "Inter-ExtraBold" }
+          : weight === "700"
+            ? { fontFamily: "Inter-Bold" }
+            : weight === "600"
+              ? { fontFamily: "Inter-SemiBold" }
+              : weight === "500"
+                ? { fontFamily: "Inter-Medium" }
+                : weight === "400"
+                  ? { fontFamily: "Inter" }
+                  : {},
+        {
+          letterSpacing: variant.startsWith("label") ? 1.5 : undefined,
+        },
         style as TextStyle,
       ]}
       {...props}

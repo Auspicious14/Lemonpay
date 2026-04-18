@@ -48,7 +48,7 @@ export default function FundWalletScreen() {
 
     try {
       const response = await fundWallet({
-        amount: amountVal,
+        amount: amountVal.toString(),
         email: user?.email || "",
       });
 

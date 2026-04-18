@@ -18,7 +18,7 @@ export const useWalletBalance = () => {
 };
 
 interface FundWalletParams {
-  amount: number;
+  amount: string;
   email: string;
 }
 
@@ -27,11 +27,13 @@ export const useFundWallet = () => {
 
   return useMutation({
     mutationFn: async ({ amount, email }: FundWalletParams) => {
-      const response = await apiClient.post<ApiResponse<FundWalletResponse>>(
+      // NOTE: nested data.data in actual response — extract correctly:
+      // response.data.data.data = { authorization_url, ... }
+      const response = await apiClient.post<any>(
         ENDPOINTS.WALLET.FUND,
-        { amount: amount.toString(), email },
+        { amount, email },
       );
-      return response.data.data;
+      return response.data.data.data as FundWalletResponse;
     },
     onSuccess: () => {
       // Invalidate balance queries after successful initiation

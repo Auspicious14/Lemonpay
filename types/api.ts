@@ -7,6 +7,17 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+// Paginated Response
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    current_page: number;
+    total_pages: number;
+    total_items: number;
+    per_page: number;
+  };
+}
+
 // Auth
 export interface LoginResponse {
   user: User;
@@ -37,6 +48,53 @@ export interface FundWalletResponse {
   reference: string;
 }
 
+// Transactions
+export interface Transaction {
+  id: number;
+  user_id: string;
+  wallet_id: number;
+  type: "credit" | "debit";
+  amount: string; // decimal string "1000000.00"
+  balance_before: string;
+  balance_after: string;
+  reference: string;
+  description: string;
+  status: "completed" | "pending" | "failed";
+  paystack_reference: string | null;
+  paystack_transfer_code: string | null;
+  paid_at: string | null;
+  processed_at: string;
+  reversed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface LedgerBalance {
+  balance: number;
+  currency: string;
+  formatted: string;
+  last_updated: string;
+}
+
+// Bank Accounts
+export interface Bank {
+  id: number;
+  name: string;
+  slug: string;
+  code: string;
+  supports_transfer: boolean;
+  active: boolean;
+}
+
+export interface BankAccount {
+  id: number;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  recipient_code: string;
+}
+
 // Escrow
 export interface EscrowParticipant {
   id: string;
@@ -46,11 +104,15 @@ export interface EscrowParticipant {
 }
 
 export type EscrowStatus =
+  | "pending_seller_agreement"
+  | "pending_buyer_confirmation"
   | "locked"
   | "funded"
-  | "delivery_marked"
+  | "awaiting_buyer_release"
   | "released"
-  | "disputed";
+  | "disputed"
+  | "resolved"
+  | "refunded";
 
 export interface Escrow {
   id: number;
@@ -85,4 +147,24 @@ export interface Escrow {
   days_remaining_for_confirmation: number;
   buyer: EscrowParticipant;
   seller: EscrowParticipant;
+}
+
+// Disputes
+export interface Dispute {
+  uuid: string;
+  escrow_uuid: string;
+  description: string;
+  reason: "not_received" | "not_as_described" | "damaged" | "other";
+  status: string;
+  attachment?: string;
+  created_at: string;
+}
+
+// Notifications
+export interface Notification {
+  id: string;
+  type: string;
+  data: Record<string, any>;
+  read_at: string | null;
+  created_at: string;
 }

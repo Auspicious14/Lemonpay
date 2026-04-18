@@ -1,254 +1,722 @@
-import React from "react";
-import { View, ScrollView, TouchableOpacity, Image } from "react-native";
+import React, { useState } from "react";
+import { View, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Text } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ShieldCheck,
-  ArrowLeft,
-  Bell,
   User,
   Store,
-  Verified,
-  LockOpen,
+  Lock,
   Gavel,
-  Info,
-  Truck,
-  Package,
-  ExternalLink,
-  MessageSquare,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  MessageCircle,
+  HelpCircle,
+  Wallet,
+  ArrowLeft,
 } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Screen } from "@/components/ui/Screen";
 import { Typography } from "@/components/ui/Typography";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { StepIndicator, EscrowStep } from "@/components/ui/StepIndicator";
+import { useAuth } from "@/context/AuthContext";
+import {
+  useEscrowDetail,
+  useSellerAgreement,
+  useConfirmAgreement,
+  useFundEscrow,
+  useMarkDelivered,
+  useConfirmDelivery,
+} from "@/lib/hooks/useEscrow";
+import { useWalletBalance } from "@/lib/hooks/useWallet";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
+import { getUserRole } from "@/lib/utils/escrow";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useToastStore } from "@/store/useToastStore";
+import { Avatar } from "@/components/ui/Avatar";
 
 export default function EscrowDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const showToast = useToastStore((state) => state.show);
+  const escrowId = parseInt(id || "0", 10);
+
+  const { data: escrow, isLoading } = useEscrowDetail(escrowId);
+  const { data: balanceData } = useWalletBalance();
+
+  const [isSellerTermsModalVisible, setIsSellerTermsModalVisible] = useState(false);
+  const [sellerTerms, setSellerTerms] = useState("");
+
+  const sellerAgreementMutation = useSellerAgreement(escrowId);
+  const confirmAgreementMutation = useConfirmAgreement(escrowId);
+  const fundEscrowMutation = useFundEscrow(escrowId);
+  const markDeliveredMutation = useMarkDelivered(escrowId);
+  const confirmDeliveryMutation = useConfirmDelivery(escrowId);
+
+  if (isLoading || !escrow) {
+    return (
+      <Screen showBackButton title="Escrow Detail">
+        <View className="flex-1 items-center justify-center">
+          <LoadingSpinner />
+        </View>
+      </Screen>
+    );
+  }
+
+  const role = getUserRole(escrow, user?.id || "");
+  const isBuyer = role === "buyer";
+  const isSeller = role === "seller";
+  
+  // Custom Status Badge Info for Screen 5
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case "released":
+        return { label: "RELEASED", bg: "bg-[#00C896]/20", text: "text-[#00C896]" };
+      case "disputed":
+        return { label: "DISPUTED", bg: "bg-[#FF4D4F]/20", text: "text-[#FF4D4F]" };
+      case "funded":
+        return { label: "FUNDED", bg: "bg-blue-500/20", text: "text-blue-500" };
+      case "awaiting_buyer_release":
+        return { label: "AWAITING RELEASE", bg: "bg-[#F5E642]/20", text: "text-[#F5E642]" };
+      default:
+        return { label: "ESCROW ACTIVE", bg: "bg-[#2D3018]", text: "text-[#F5E642]" };
+    }
+  };
+
+  const statusDisplay = getStatusDisplay(escrow.status);
+
+  const handleAddSellerTerms = async () => {
+    try {
+      await sellerAgreementMutation.mutateAsync(sellerTerms);
+      setIsSellerTermsModalVisible(false);
+      showToast("Terms added successfully", "success");
+    } catch (error) {
+      console.error("Failed to add terms", error);
+    }
+  };
+
+  const handleConfirmAgreement = async () => {
+    Alert.alert(
+      "Confirm Agreement",
+      "By agreeing, you lock the escrow terms. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm & Lock",
+          onPress: async () => {
+            try {
+              await confirmAgreementMutation.mutateAsync();
+              showToast("Escrow terms locked", "success");
+            } catch (error) {
+              console.error("Failed to confirm agreement", error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleFundEscrow = async () => {
+    const amount = parseFloat(escrow.amount);
+    const balance = balanceData?.balance || 0;
+
+    if (balance < amount) {
+      Alert.alert("Insufficient Balance", "Please fund your wallet first.");
+      return;
+    }
+
+    Alert.alert(
+      "Fund Escrow",
+      `You are about to fund ${formatCurrency(amount)} from your wallet. Confirm?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Fund Now",
+          onPress: async () => {
+            try {
+              await fundEscrowMutation.mutateAsync();
+              showToast("Escrow funded successfully", "success");
+            } catch (error) {
+              console.error("Failed to fund escrow", error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleMarkDelivered = async () => {
+    Alert.alert(
+      "Mark as Delivered",
+      "Confirm you've delivered the item/service?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Delivered",
+          onPress: async () => {
+            try {
+              await markDeliveredMutation.mutateAsync();
+              showToast("Marked as delivered", "success");
+            } catch (error) {
+              console.error("Failed to mark delivered", error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleConfirmDelivery = async () => {
+    Alert.alert(
+      "Release Funds",
+      "WARNING: This will release funds to the seller. Only confirm if you have received the item/service as described.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm & Release",
+          onPress: async () => {
+            try {
+              await confirmDeliveryMutation.mutateAsync();
+              showToast("Funds released to seller", "success");
+            } catch (error) {
+              console.error("Failed to confirm delivery", error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const renderStatusBanner = () => {
+    if (escrow.status === "pending_seller_agreement" || escrow.status === "pending_buyer_confirmation" || escrow.status === "locked") {
+      return (
+        <View className="bg-[#2D3018] rounded-[20px] p-5 flex-row items-center">
+          <View className="w-12 h-12 bg-[#161B22] rounded-xl items-center justify-center mr-4">
+            <Clock size={24} color="#F5E642" />
+          </View>
+          <View className="flex-1">
+            <Typography 
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-[#F5E642] text-base"
+            >
+              Awaiting Seller Confirmation
+            </Typography>
+            <Typography 
+              style={{ fontFamily: 'Inter' }}
+              className="text-[#8B949E] text-xs mt-1"
+            >
+              You have confirmed the terms. We're waiting for the seller to verify and start fulfillment.
+            </Typography>
+          </View>
+        </View>
+      );
+    }
+    if (escrow.status === "funded") {
+      return (
+        <View className="bg-blue-500/10 rounded-[20px] p-5 flex-row items-center border border-blue-500/20">
+          <View className="w-12 h-12 bg-[#161B22] rounded-xl items-center justify-center mr-4">
+            <Store size={24} color="#3b82f6" />
+          </View>
+          <View className="flex-1">
+            <Typography 
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-white text-base"
+            >
+              Seller Delivering
+            </Typography>
+            <Typography 
+              style={{ fontFamily: 'Inter' }}
+              className="text-[#8B949E] text-xs mt-1"
+            >
+              The seller has been notified and is preparing your order.
+            </Typography>
+          </View>
+        </View>
+      );
+    }
+    if (escrow.status === "awaiting_buyer_release") {
+      return (
+        <View className="bg-[#00C896]/10 rounded-[20px] p-5 flex-row items-center border border-[#00C896]/20">
+          <View className="w-12 h-12 bg-[#161B22] rounded-xl items-center justify-center mr-4">
+            <CheckCircle2 size={24} color="#00C896" />
+          </View>
+          <View className="flex-1">
+            <Typography 
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-white text-base"
+            >
+              Confirm Receipt to Release Funds
+            </Typography>
+            <Typography 
+              style={{ fontFamily: 'Inter' }}
+              className="text-[#8B949E] text-xs mt-1"
+            >
+              The seller has marked the item as delivered. Please confirm receipt.
+            </Typography>
+          </View>
+        </View>
+      );
+    }
+    if (escrow.status === "disputed") {
+      return (
+        <View className="bg-[#FF4D4F]/10 rounded-[20px] p-5 flex-row items-center border border-[#FF4D4F]/20">
+          <View className="w-12 h-12 bg-[#161B22] rounded-xl items-center justify-center mr-4">
+            <Gavel size={24} color="#FF4D4F" />
+          </View>
+          <View className="flex-1">
+            <Typography 
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-[#FF4D4F] text-base"
+            >
+              Dispute Under Review
+            </Typography>
+            <Typography 
+              style={{ fontFamily: 'Inter' }}
+              className="text-[#8B949E] text-xs mt-1"
+            >
+              LemonPay mediators are reviewing the evidence provided.
+            </Typography>
+          </View>
+        </View>
+      );
+    }
+    return null;
+  };
+
+  const getTimelineStage = (status: string) => {
+    const stages = [
+      { id: 1, title: "Payment Secured", sub: "Funds locked in LemonPay vault.", time: formatDate(escrow.funded_at || escrow.created_at) },
+      { id: 2, title: "Negotiation & Agreement", sub: "Terms confirmed by both parties.", time: formatDate(escrow.locked_at || escrow.created_at) },
+      { id: 3, title: "Item Fulfillment", sub: "Seller preparing and shipping item.", time: "" },
+      { id: 4, title: "Release of Funds", sub: "Transaction completed successfully.", time: "" },
+    ];
+
+    let activeStage = 1;
+    if (["pending_seller_agreement", "pending_buyer_confirmation", "locked"].includes(status)) activeStage = 2;
+    if (["funded", "awaiting_buyer_release"].includes(status)) activeStage = 3;
+    if (status === "released") activeStage = 4;
+
+    return { stages, activeStage };
+  };
+
+  const { stages, activeStage } = getTimelineStage(escrow.status);
 
   return (
     <Screen
       showBackButton
-      title="Escrow Details"
+      onBack={() => router.back()}
+      title="Escrow Detail"
       rightAction={
-        <TouchableOpacity className="active:scale-95 transition-transform">
-          <Bell size={24} color="#f5e642" />
-        </TouchableOpacity>
+        <View className="flex-row items-center" style={{ gap: 16 }}>
+          <HelpCircle size={22} color="white" />
+          <Avatar
+            name={`${user?.first_name} ${user?.last_name}`}
+            size="sm"
+            className="rounded-full"
+          />
+        </View>
       }
     >
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 pb-32">
-        <View className="space-y-10 py-6">
-          {/* Hero Section: Bento Style */}
-          <View className="space-y-6">
-            <Card
-              variant="low"
-              className="p-8 relative overflow-hidden min-h-[180px]"
-            >
-              <View className="absolute top-4 right-4 z-10">
-                <View className="bg-secondary/10 px-4 py-1.5 rounded-full border border-secondary/20">
-                  <Typography
-                    variant="label-sm"
-                    className="text-secondary text-[10px] font-inter-extrabold uppercase tracking-widest"
-                  >
-                    Funded
-                  </Typography>
-                </View>
-              </View>
-
-              <View className="space-y-4">
-                <Typography
-                  variant="label-sm"
-                  className="text-text-secondary uppercase tracking-widest text-[10px]"
-                >
-                  Transaction ID: {id || "LP-9023411"}
-                </Typography>
-                <Typography
-                  variant="display"
-                  className="text-3xl tracking-tight"
-                >
-                  iPhone 15 Pro Max
-                </Typography>
-                <Typography
-                  variant="display"
-                  className="text-5xl text-primary-fixed"
-                >
-                  ₦1,200,000
-                </Typography>
-
-                <View className="flex-row items-center space-x-2 pt-2">
-                  <ShieldCheck size={14} color="#43e5b1" fill="#43e5b1" />
-                  <Typography
-                    variant="caption"
-                    className="text-secondary font-bold text-[10px] uppercase tracking-[0.1em]"
-                  >
-                    Secure by LemonPay
-                  </Typography>
-                </View>
-              </View>
-            </Card>
-
-            <Card
-              variant="default"
-              className="p-8 space-y-6 flex-row justify-between items-center border border-outline-variant/10"
-            >
-              <View className="flex-1 space-y-4">
-                <View className="flex-row items-center space-x-4">
-                  <View className="w-10 h-10 rounded-2xl bg-surface-container-high items-center justify-center">
-                    <User size={18} color="#f5e642" />
-                  </View>
-                  <View>
-                    <Typography
-                      variant="label-sm"
-                      className="text-text-secondary text-[8px] uppercase tracking-widest"
-                    >
-                      Buyer
-                    </Typography>
-                    <View className="flex-row items-center space-x-1">
-                      <Typography variant="body" className="font-bold">
-                        Chidi O.
-                      </Typography>
-                      <Verified size={12} color="#43e5b1" fill="#43e5b1" />
-                    </View>
-                  </View>
-                </View>
-                <View className="h-[1px] bg-outline-variant/5 w-full" />
-                <View className="flex-row items-center space-x-4">
-                  <View className="w-10 h-10 rounded-2xl bg-surface-container-high items-center justify-center">
-                    <Store size={18} color="#f5e642" />
-                  </View>
-                  <View>
-                    <Typography
-                      variant="label-sm"
-                      className="text-text-secondary text-[8px] uppercase tracking-widest"
-                    >
-                      Seller
-                    </Typography>
-                    <View className="flex-row items-center space-x-1">
-                      <Typography variant="body" className="font-bold">
-                        Gadget Hub Lagos
-                      </Typography>
-                      <Verified size={12} color="#43e5b1" fill="#43e5b1" />
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </Card>
-          </View>
-
-          {/* Details & Timeline */}
-          <View className="flex-row space-x-8">
-            {/* Timeline Section */}
-            <View className="flex-1 space-y-6">
-              <Typography variant="heading" className="text-lg">
-                Escrow Journey
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-6">
+        <View className="py-6" style={{ gap: 24 }}>
+          {/* HEADER SECTION */}
+          <View className="flex-row justify-between items-start">
+            <View className="flex-1 mr-4">
+              <Typography 
+                style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+                className="text-[#8B949E] text-[10px] uppercase mb-1"
+              >
+                TRANSACTION ID: #LMN-{escrow.id}
               </Typography>
-              <Card variant="low" className="p-8 pb-10">
-                <StepIndicator currentStep="delivered" vertical />
-              </Card>
+              <Typography 
+                style={{ fontFamily: 'Inter-Bold' }}
+                className="text-white text-[28px] leading-[34px]"
+              >
+                {escrow.title}
+              </Typography>
             </View>
-
-            {/* Description & Action column simulation for tablet, or stacked for mobile */}
+            <View 
+              style={{ 
+                backgroundColor: statusDisplay.bg === "bg-[#2D3018]" ? "#2D3018" : undefined,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 20
+              }}
+              className={statusDisplay.bg !== "bg-[#2D3018]" ? statusDisplay.bg : ""}
+            >
+              <Typography 
+                style={{ 
+                  fontFamily: 'Inter-Bold', 
+                  fontSize: 10, 
+                  letterSpacing: 1.5,
+                  color: statusDisplay.text === "text-[#F5E642]" ? "#F5E642" : undefined
+                }}
+                className={statusDisplay.text !== "text-[#F5E642]" ? statusDisplay.text : ""}
+              >
+                {statusDisplay.label}
+              </Typography>
+            </View>
           </View>
 
-          {/* Item Description Section */}
-          <View className="space-y-6">
-            <Typography variant="heading" className="text-lg">
-              Item Summary
-            </Typography>
-            <Card
-              variant="default"
-              className="p-8 space-y-8 border border-outline-variant/10"
+          {/* BALANCE CARD */}
+          <View className="relative">
+            <Typography 
+              style={{ fontFamily: 'Inter' }}
+              className="text-[#8B949E] text-sm mb-1"
             >
-              <View>
-                <Typography
-                  variant="body"
-                  className="text-text-secondary leading-relaxed"
+              Total Locked Funds
+            </Typography>
+            <Typography 
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-[#F5E642] text-[44px]"
+            >
+              {formatCurrency(escrow.amount)}
+            </Typography>
+            <View className="absolute right-0 bottom-0 opacity-10">
+              <Wallet size={80} color="#F5E642" />
+            </View>
+          </View>
+
+          {/* STATUS BANNER */}
+          {renderStatusBanner()}
+
+          {/* ESCROW JOURNEY SECTION */}
+          <View style={{ gap: 16 }}>
+            <Typography 
+              style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+              className="text-[#8B949E] text-[10px] uppercase"
+            >
+              ESCROW JOURNEY
+            </Typography>
+            
+            <View className="pl-2">
+              {stages.map((stage, index) => {
+                const isActive = activeStage === stage.id;
+                const isCompleted = activeStage > stage.id;
+                const isPending = activeStage < stage.id;
+
+                return (
+                  <View key={stage.id} style={{ flexDirection: 'row', minHeight: 80 }}>
+                    <View style={{ alignItems: 'center', marginRight: 20, width: 20 }}>
+                      <View style={{ 
+                        width: isActive ? 16 : 12, 
+                        height: isActive ? 16 : 12, 
+                        borderRadius: 8, 
+                        backgroundColor: isCompleted ? '#00C896' : 
+                                         isActive ? '#F5E642' : 'transparent', 
+                        borderWidth: isPending ? 2 : 0, 
+                        borderColor: '#30363D', 
+                        zIndex: 1, 
+                      }} />
+                      {index < stages.length - 1 && (
+                        <View style={{ 
+                          width: 2, 
+                          flex: 1, 
+                          backgroundColor: isCompleted ? '#00C896' : '#30363D', 
+                          marginTop: 4, 
+                        }} />
+                      )}
+                    </View>
+                    <View style={{ flex: 1, paddingBottom: 24 }}>
+                      <Typography 
+                        style={{ fontFamily: 'Inter-Bold' }}
+                        className={`text-base ${isActive ? "text-[#F5E642]" : isPending ? "text-[#484f58]" : "text-white"}`}
+                      >
+                        {stage.title}
+                      </Typography>
+                      <Typography 
+                        style={{ fontFamily: 'Inter' }}
+                        className="text-[#8B949E] text-xs mt-0.5"
+                      >
+                        {stage.sub} {stage.time ? `• ${stage.time}` : ""}
+                      </Typography>
+                      {isActive && stage.id === 2 && (
+                        <View className="bg-[#161B22] self-start px-2 py-1 rounded mt-2">
+                          <Typography 
+                            style={{ fontFamily: 'Inter-Bold' }}
+                            className="text-[#F5E642] text-[8px] uppercase"
+                          >
+                            STATUS: PENDING SELLER
+                          </Typography>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* AGREED TERMS SECTION */}
+          <View style={{ gap: 16 }}>
+            <Typography 
+              style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+              className="text-[#8B949E] text-[10px] uppercase"
+            >
+              AGREED TERMS
+            </Typography>
+            <View className="bg-[#161B22] rounded-[20px] border border-[#30363D] overflow-hidden">
+              <View style={{ flexDirection: 'row' }}>
+                <View style={{ flex: 1, padding: 16, borderRightWidth: 1, borderRightColor: '#30363D' }}>
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+                    className="text-[#8B949E] text-[8px] uppercase mb-1"
+                  >
+                    INSPECTION PERIOD
+                  </Typography>
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-white text-sm"
+                  >
+                    48 Hours
+                  </Typography>
+                </View>
+                <View style={{ flex: 1, padding: 16 }}>
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+                    className="text-[#8B949E] text-[8px] uppercase mb-1"
+                  >
+                    SHIPPING METHOD
+                  </Typography>
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-white text-sm"
+                  >
+                    Priority Doorstep
+                  </Typography>
+                </View>
+              </View>
+              <View style={{ height: 1, backgroundColor: '#30363D' }} />
+              <View style={{ flexDirection: 'row' }}>
+                <View style={{ flex: 1, padding: 16, borderRightWidth: 1, borderRightColor: '#30363D' }}>
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+                    className="text-[#8B949E] text-[8px] uppercase mb-1"
+                  >
+                    RETURN POLICY
+                  </Typography>
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-[#00C896] text-sm"
+                  >
+                    Free Returns
+                  </Typography>
+                </View>
+                <View style={{ flex: 1, padding: 16 }}>
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+                    className="text-[#8B949E] text-[8px] uppercase mb-1"
+                  >
+                    ESCROW FEE
+                  </Typography>
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-white text-sm"
+                  >
+                    {formatCurrency(parseFloat(escrow.amount) * 0.005)} (Split)
+                  </Typography>
+                </View>
+              </View>
+              <View style={{ height: 1, backgroundColor: '#30363D' }} />
+              <View style={{ padding: 16 }}>
+                <Typography 
+                  style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+                  className="text-[#8B949E] text-[8px] uppercase mb-2"
                 >
-                  iPhone 15 Pro Max, 256GB, Natural Titanium. Brand new in box,
-                  factory unlocked with 1-year Apple Warranty. Includes original
-                  invoice and accessories.
+                  DETAILED NOTES
+                </Typography>
+                <Typography 
+                  style={{ fontFamily: 'Inter' }}
+                  className="text-[#8B949E] text-xs leading-5"
+                >
+                  {escrow.final_agreement || escrow.buyer_terms}
                 </Typography>
               </View>
+            </View>
+          </View>
 
-              <View className="flex-row space-x-4">
-                <Card
-                  variant="low"
-                  className="flex-1 p-4 border border-outline-variant/5"
+          {/* PARTICIPANTS ROW */}
+          <View className="flex-row items-center justify-between py-6 border-t border-[#30363D]">
+            <View className="flex-row items-center flex-1">
+              <Avatar name={`${user?.first_name} ${user?.last_name}`} size="sm" className="mr-3" />
+              <View>
+                <Typography 
+                  style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+                  className="text-[#8B949E] text-[8px] uppercase"
                 >
-                  <Typography
-                    variant="label-sm"
-                    className="text-text-secondary text-[8px] uppercase font-bold mb-1"
-                  >
-                    Carrier
-                  </Typography>
-                  <Typography variant="body" className="font-semibold text-sm">
-                    DHL Express
-                  </Typography>
-                </Card>
-                <Card
-                  variant="low"
-                  className="flex-1 p-4 border border-outline-variant/5"
+                  BUYER
+                </Typography>
+                <Typography 
+                  style={{ fontFamily: 'Inter-Bold' }}
+                  className="text-white text-sm"
                 >
-                  <Typography
-                    variant="label-sm"
-                    className="text-text-secondary text-[8px] uppercase font-bold mb-1"
-                  >
-                    Tracking
-                  </Typography>
-                  <Typography
-                    variant="body"
-                    className="font-semibold text-primary-fixed text-sm"
-                  >
-                    DHL-8829-001
-                  </Typography>
-                </Card>
+                  You
+                </Typography>
               </View>
+            </View>
+            <View className="w-[1px] h-8 bg-[#30363D] mx-4" />
+            <View className="flex-row items-center flex-1">
+              <Avatar name={escrow.seller?.first_name || "S"} size="sm" className="mr-3" />
+              <View>
+                <Typography 
+                  style={{ fontFamily: 'Inter-Bold', letterSpacing: 1.5 }}
+                  className="text-[#8B949E] text-[8px] uppercase"
+                >
+                  SELLER
+                </Typography>
+                <Typography 
+                  style={{ fontFamily: 'Inter-Bold' }}
+                  className="text-white text-sm"
+                >
+                  {escrow.seller?.first_name ? `${escrow.seller.first_name} ${escrow.seller.last_name?.charAt(0)}.` : "Merchant"}
+                </Typography>
+              </View>
+            </View>
+          </View>
 
-              <View className="space-y-4 pt-4 border-t border-outline-variant/10">
-                <Button
-                  label="Confirm Delivery"
-                  onPress={() => {}}
-                  leftIcon={<LockOpen size={20} color="#1f1c00" />}
-                  className="h-16 shadow-2xl shadow-primary-fixed/20"
-                />
-                <TouchableOpacity className="flex-row items-center justify-center space-x-2 h-14 bg-transparent border border-outline-variant/30 rounded-2xl active:bg-surface-container">
-                  <Gavel size={18} color="#ffb4ab" />
-                  <Typography
-                    variant="body"
-                    className="font-bold text-accent-danger"
+          {/* CONTEXT ACTIONS */}
+          <View className="pb-24">
+            {escrow.status === "pending_seller_agreement" && isSeller && (
+              <TouchableOpacity onPress={() => setIsSellerTermsModalVisible(true)}>
+                <LinearGradient colors={["#F5E642", "#D4C200"]} className="h-14 rounded-[20px] items-center justify-center">
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-[#0D1117] text-base uppercase"
                   >
-                    Raise Dispute
+                    ADD YOUR TERMS
+                  </Typography>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {escrow.status === "pending_buyer_confirmation" && isBuyer && (
+              <TouchableOpacity onPress={handleConfirmAgreement}>
+                <LinearGradient colors={["#F5E642", "#D4C200"]} className="h-14 rounded-[20px] items-center justify-center">
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-[#0D1117] text-base uppercase"
+                  >
+                    AGREE & LOCK ESCROW
+                  </Typography>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {escrow.status === "locked" && isBuyer && escrow.can_be_funded && (
+              <TouchableOpacity onPress={handleFundEscrow}>
+                <LinearGradient colors={["#F5E642", "#D4C200"]} className="h-14 rounded-[20px] items-center justify-center">
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-[#0D1117] text-base uppercase"
+                  >
+                    FUND ESCROW
+                  </Typography>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {escrow.status === "funded" && isSeller && (
+              <TouchableOpacity onPress={handleMarkDelivered}>
+                <LinearGradient colors={["#F5E642", "#D4C200"]} className="h-14 rounded-[20px] items-center justify-center">
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-[#0D1117] text-base uppercase"
+                  >
+                    MARK AS DELIVERED
+                  </Typography>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+
+            {escrow.status === "awaiting_buyer_release" && isBuyer && (
+              <View style={{ gap: 16 }}>
+                <TouchableOpacity onPress={handleConfirmDelivery}>
+                  <LinearGradient colors={["#F5E642", "#D4C200"]} className="h-14 rounded-[20px] items-center justify-center">
+                    <Typography 
+                      style={{ fontFamily: 'Inter-Bold' }}
+                      className="text-[#0D1117] text-base uppercase"
+                    >
+                      CONFIRM & RELEASE FUNDS
+                    </Typography>
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => router.push(`/escrow/${escrowId}/dispute`)}
+                  className="h-14 rounded-[20px] border border-[#FF4D4F]/30 items-center justify-center flex-row"
+                >
+                  <Gavel size={18} color="#FF4D4F" />
+                  <Typography 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-[#FF4D4F] text-sm ml-2"
+                  >
+                    OPEN DISPUTE
                   </Typography>
                 </TouchableOpacity>
               </View>
-            </Card>
-          </View>
-
-          {/* Trust Signal */}
-          <View className="flex-row items-center space-x-4 bg-surface-container-lowest/50 rounded-2xl p-6 border border-outline-variant/10">
-            <View className="w-12 h-12 rounded-full bg-secondary/10 items-center justify-center">
-              <ShieldCheck size={24} color="#43e5b1" fill="#43e5b1" />
-            </View>
-            <View className="flex-1 space-y-1">
-              <Typography variant="body" className="font-bold">
-                LemonPay Protection Active
-              </Typography>
-              <Typography
-                variant="caption"
-                className="text-text-secondary text-[11px] leading-snug"
-              >
-                Your funds are protected by 256-bit encryption and our secure
-                multi-sig protocol.
-              </Typography>
-            </View>
+            )}
           </View>
         </View>
       </ScrollView>
 
-      {/* Floating Chat Action */}
-      <TouchableOpacity className="absolute bottom-32 right-6 w-16 h-16 bg-primary-fixed rounded-2xl items-center justify-center shadow-2xl shadow-primary-fixed/30 active:scale-95 transition-transform z-40">
-        <MessageSquare size={28} color="#1f1c00" fill="#1f1c00" />
+      {/* FLOATING CHAT BUTTON */}
+      <TouchableOpacity 
+        className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-[#F5E642] items-center justify-center shadow-lg"
+        style={{ elevation: 5 }}
+      >
+        <MessageCircle size={24} color="#0D1117" />
       </TouchableOpacity>
+
+      {/* Seller Terms Modal */}
+      <Modal
+        visible={isSellerTermsModalVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <View className="flex-1 bg-black/80 justify-end">
+          <View className="bg-[#161B22] rounded-t-[30px] p-6 h-[60%]">
+            <View className="flex-row justify-between items-center mb-6">
+              <Typography 
+                style={{ fontFamily: 'Inter-Bold' }}
+                className="text-white text-lg"
+              >
+                Add Your Terms
+              </Typography>
+              <TouchableOpacity onPress={() => setIsSellerTermsModalVisible(false)}>
+                <Typography 
+                  style={{ fontFamily: 'Inter' }}
+                  className="text-[#8B949E]"
+                >
+                  Cancel
+                </Typography>
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              multiline
+              numberOfLines={8}
+              placeholder="Enter your terms here..."
+              placeholderTextColor="#484f58"
+              className="bg-[#0D1117] text-white p-4 rounded-xl text-sm h-48"
+              style={{ fontFamily: 'Inter', textAlignVertical: "top" }}
+              value={sellerTerms}
+              onChangeText={setSellerTerms}
+            />
+            <TouchableOpacity 
+              onPress={handleAddSellerTerms}
+              className="mt-6"
+            >
+              <LinearGradient colors={["#F5E642", "#D4C200"]} className="h-14 rounded-[20px] items-center justify-center">
+                <Typography 
+                  style={{ fontFamily: 'Inter-Bold' }}
+                  className="text-[#0D1117] text-base"
+                >
+                  SUBMIT TERMS
+                </Typography>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }

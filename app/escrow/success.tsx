@@ -24,7 +24,7 @@ export default function EscrowSuccessScreen() {
         contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
         className="px-6 py-20"
       >
-        <View className="items-center space-y-8">
+        <View style={{ gap: 32 }} className="items-center">
           <View className="relative">
             <View
               className="absolute inset-0 bg-secondary/20 rounded-full scale-[2.5]"
@@ -40,7 +40,7 @@ export default function EscrowSuccessScreen() {
             </View>
           </View>
 
-          <View className="items-center space-y-2">
+          <View style={{ gap: 8 }} className="items-center">
             <Typography
               variant="display-lg"
               className="text-center tracking-tight leading-tight"
@@ -62,8 +62,8 @@ export default function EscrowSuccessScreen() {
             </Typography>
           </View>
 
-          <Card variant="low" className="w-full p-8 space-y-6">
-            <View className="space-y-4">
+          <Card variant="low" className="w-full p-8">
+            <View style={{ gap: 24 }}>
               <View className="flex-row justify-between items-center pb-4 border-b border-outline-variant/10">
                 <Typography
                   variant="label-sm"
@@ -78,7 +78,7 @@ export default function EscrowSuccessScreen() {
                   ₦450,000.00
                 </Typography>
               </View>
-              <View className="space-y-4 pt-2">
+              <View style={{ gap: 16 }} className="pt-2">
                 <View className="flex-row justify-between">
                   <Typography variant="caption" className="text-text-secondary">
                     Asset
@@ -124,8 +124,8 @@ export default function EscrowSuccessScreen() {
               className="absolute top-[-16px] right-[-16px] w-24 h-24 bg-primary-fixed/5 rounded-full"
               style={{ filter: "blur(32px)" }}
             />
-            <View className="space-y-4">
-              <View className="flex-row items-center space-x-3">
+            <View style={{ gap: 16 }}>
+              <View className="flex-row items-center" style={{ gap: 12 }}>
                 <View className="bg-primary-fixed/10 p-2 rounded-xl">
                   <LinkIcon size={20} color="#f5e642" />
                 </View>
@@ -140,7 +140,7 @@ export default function EscrowSuccessScreen() {
                 Send this link to the seller to review the terms and confirm the
                 agreement.
               </Typography>
-              <View className="flex-row items-center space-x-2 bg-surface-container-lowest rounded-2xl p-2 pl-4 border border-outline-variant/20">
+              <View className="flex-row items-center bg-surface-container-lowest rounded-2xl p-2 pl-4 border border-outline-variant/20" style={{ gap: 8 }}>
                 <Typography
                   variant="caption"
                   className="text-primary-fixed font-inter-bold text-[10px] flex-1"
@@ -160,7 +160,7 @@ export default function EscrowSuccessScreen() {
             </View>
           </Card>
 
-          <View className="w-full space-y-4 pt-4">
+          <View style={{ gap: 16 }} className="w-full pt-4">
             <Button
               label="View Details"
               variant="secondary"

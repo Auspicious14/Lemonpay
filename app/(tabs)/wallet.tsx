@@ -20,36 +20,45 @@ import {
 } from "lucide-react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useWalletBalance } from "@/lib/hooks/useWallet";
-import { useEscrowList } from "@/lib/hooks/useEscrow";
+import { useTransactions } from "@/lib/hooks/useTransactions";
 import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { TransactionRow } from "@/components/ui/TransactionRow";
+import { TransactionRow, TransactionType } from "@/components/ui/TransactionRow";
 import { Avatar } from "@/components/ui/Avatar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useToastStore } from "@/store/useToastStore";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
 
 export default function WalletScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { show: showToast } = useToastStore();
 
-  const { data: balance, refetch: refetchBalance } = useWalletBalance();
+  const { 
+    data: balance, 
+    isLoading: isBalanceLoading,
+    refetch: refetchBalance 
+  } = useWalletBalance();
 
-  const { data: escrows, refetch: refetchEscrows } = useEscrowList();
+  const { 
+    data: transactionsData, 
+    isLoading: isTransactionsLoading,
+    refetch: refetchTransactions 
+  } = useTransactions();
 
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refetchBalance(), refetchEscrows()]);
+    await Promise.all([refetchBalance(), refetchTransactions()]);
     setRefreshing(false);
-  }, [refetchBalance, refetchEscrows]);
+  }, [refetchBalance, refetchTransactions]);
 
   // Refetch data when screen comes into focus
   useRefreshOnFocus(refetchBalance);
-  useRefreshOnFocus(refetchEscrows);
+  useRefreshOnFocus(refetchTransactions);
 
-  const recentTransactions = (escrows || []).slice(0, 10);
+  const transactions = transactionsData?.data || [];
 
   return (
     <SafeAreaView className="flex-1 bg-[#0D1117]">
@@ -65,7 +74,10 @@ export default function WalletScreen() {
           />
           <Text className="text-white font-inter-bold text-xl">LemonPay</Text>
         </View>
-        <TouchableOpacity className="w-10 h-10 items-center justify-center">
+        <TouchableOpacity 
+          className="w-10 h-10 items-center justify-center"
+          onPress={() => router.push("/notifications")}
+        >
           <Bell size={24} color="white" />
         </TouchableOpacity>
       </View>
@@ -99,10 +111,7 @@ export default function WalletScreen() {
           </View>
 
           <Text className="text-white font-inter-extrabold text-4xl mb-2">
-            ₦
-            {balance?.balance.toLocaleString("en-NG", {
-              minimumFractionDigits: 1,
-            }) || "0.0"}
+            {isBalanceLoading ? "..." : formatCurrency(balance?.balance || 0)}
           </Text>
 
           <View className="flex-row items-center mb-8">
@@ -157,52 +166,35 @@ export default function WalletScreen() {
           title="Recent Transactions"
           subtitle="Activity from the last 30 days"
           actionLabel="View All"
-          onAction={() => {}}
+          onAction={() => router.push("/wallet/history")}
         />
 
-        {recentTransactions.length > 0 ? (
-          recentTransactions.map((escrow) => {
-            const isReleased = escrow.status === "released";
-            const isFunded = escrow.status === "funded";
-            const isDisputed = escrow.status === "disputed";
-
-            let title = escrow.title;
-            let type: any = "funded";
-            let status = "PENDING";
-            let color: "success" | "pending" | "danger" = "pending";
-
-            if (isReleased) {
-              title = "Escrow Released";
-              type = "released";
-              status = "SUCCESS";
-              color = "success";
-            } else if (isDisputed) {
-              title = "Disputed Escrow";
-              type = "disputed";
-              status = "DISPUTED";
-              color = "danger";
-            } else if (isFunded) {
-              title = "Escrow Funded";
-              type = "funded";
-              status = "PENDING";
-              color = "pending";
-            }
+        {isTransactionsLoading ? (
+          <View className="bg-[#161B22] rounded-xl p-10 items-center justify-center mb-8">
+            <Text className="text-[#8B949E] font-inter">Loading transactions...</Text>
+          </View>
+        ) : transactions.length > 0 ? (
+          transactions.map((tx) => {
+            const isCredit = tx.type === "credit";
+            
+            let type: TransactionType = "funded";
+            if (tx.description.includes("Escrow released")) type = "released";
+            if (tx.description.includes("Withdrawal")) type = "disputed"; // Red color
+            if (tx.description.includes("Wallet fund")) type = "funded"; // Yellow color
 
             return (
               <View
-                key={escrow.id}
+                key={tx.id}
                 className="bg-[#161B22] rounded-lg p-4 mb-2"
               >
                 <TransactionRow
                   type={type}
-                  title={title}
-                  subtitle={`${escrow.status.replace("_", " ")} • ${
-                    escrow.title
-                  } • Today`}
-                  amount={parseFloat(escrow.amount)}
-                  isCredit={isReleased}
-                  status={status}
-                  statusColor={color}
+                  title={tx.description}
+                  subtitle={`${tx.reference.substring(0, 8)} • ${formatDate(tx.created_at)}`}
+                  amount={parseFloat(tx.amount)}
+                  isCredit={isCredit}
+                  status={tx.status.toUpperCase()}
+                  statusColor={tx.status === "completed" ? "success" : tx.status === "pending" ? "pending" : "danger"}
                 />
               </View>
             );
