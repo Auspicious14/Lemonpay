@@ -19,6 +19,9 @@ export default function WalletLayout() {
       <Stack.Screen name="fund" />
       <Stack.Screen name="bank-transfer" />
       <Stack.Screen name="history" />
+      <Stack.Screen name="withdraw" />
+      <Stack.Screen name="withdraw-review" />
+      <Stack.Screen name="withdraw-success" />
     </Stack>
   );
 }

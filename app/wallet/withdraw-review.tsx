@@ -1,5 +1,5 @@
 import React from "react";
-import { View, ScrollView, TouchableOpacity } from "react-native";
+import { View, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
@@ -7,230 +7,271 @@ import {
   Landmark,
   UserSquare2,
   ShieldCheck,
-  ArrowRight,
 } from "lucide-react-native";
 import { Screen } from "@/components/ui/Screen";
 import { Typography } from "@/components/ui/Typography";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { useWithdraw } from "@/lib/hooks/useBankAccount";
+import { useToastStore } from "@/store/useToastStore";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function WithdrawReviewScreen() {
   const router = useRouter();
-  const { amount, bankName, accountNumber } = useLocalSearchParams<{
+  const showToast = useToastStore((state) => state.show);
+  const { amount, bankAccountId, bankName, accountNumber } = useLocalSearchParams<{
     amount: string;
+    bankAccountId: string;
     bankName: string;
     accountNumber: string;
   }>();
+
+  const withdrawMutation = useWithdraw();
 
   const withdrawalAmount = parseFloat(amount || "0");
   const processingFee = 100.0;
   const totalDeduction = withdrawalAmount + processingFee;
 
-  const handleConfirm = () => {
-    // TODO: Implement withdrawal logic (API call)
-    // router.push("/wallet/success");
+  const handleConfirm = async () => {
+    try {
+      const result = await withdrawMutation.mutateAsync({
+        amount: amount!,
+        bank_account_id: parseInt(bankAccountId!),
+      });
+      
+      router.replace({
+        pathname: "/wallet/withdraw-success",
+        params: {
+          amount: amount,
+          bank: bankName,
+          reference: result.reference
+        }
+      });
+    } catch (error: any) {
+      showToast(error.response?.data?.message || "Withdrawal failed", "error");
+    }
   };
 
   return (
     <Screen
-      showBackButton
-      title="Review Withdrawal"
-      className="bg-background-primary"
+      className="bg-[#0D1117]"
+      withPadding={false}
     >
+      <View className="flex-row items-center px-4 pt-4 pb-2">
+        <TouchableOpacity onPress={() => router.back()} className="mr-4">
+          <ArrowLeft size={24} color="#F5E642" />
+        </TouchableOpacity>
+        <Typography
+          style={{ fontFamily: 'Inter-Bold' }}
+          className="text-white text-xl"
+        >
+          Review Withdrawal
+        </Typography>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        className="flex-1"
+        className="flex-1 px-4 pt-6"
         contentContainerStyle={{ paddingBottom: 120 }}
       >
-        <View className="py-8 space-y-12">
-          {/* Editorial Header */}
-          <View>
-            <Typography
-              variant="label-sm"
-              className="text-primary-fixed font-inter-bold mb-2"
-            >
-              Transaction Summary
-            </Typography>
-            <Typography variant="display" className="text-white mb-4">
-              Confirm Your Transfer
-            </Typography>
-            <Typography
-              variant="body"
-              className="text-on-surface-variant text-[16px]"
-            >
-              Review the details below to ensure accuracy before authorizing the
-              fund release.
-            </Typography>
+        <View className="mb-8">
+          <Typography
+            style={{ fontFamily: 'Inter-Bold', fontSize: 10 }}
+            className="text-[#F5E642] uppercase mb-2"
+          >
+            TRANSACTION SUMMARY
+          </Typography>
+          <Typography
+            style={{ fontFamily: 'Inter-ExtraBold', fontSize: 32, lineHeight: 38 }}
+            className="text-white mb-2"
+          >
+            Confirm Your{"\n"}Transfer
+          </Typography>
+          <Typography
+            style={{ fontFamily: 'Inter', fontSize: 14 }}
+            className="text-[#8B949E]"
+          >
+            Review the details below to ensure accuracy before authorizing the fund release.
+          </Typography>
+        </View>
+
+        {/* Breakdown Card */}
+        <View className="bg-[#161B22] rounded-[24px] overflow-hidden mb-6">
+          {/* Top Half */}
+          <View className="p-5">
+            <View className="items-center mb-6">
+              <Typography
+                style={{ fontFamily: 'Inter', fontSize: 12 }}
+                className="text-[#8B949E] mb-1"
+              >
+                Final Withdrawal Amount
+              </Typography>
+              <Typography
+                style={{ fontFamily: 'Inter-ExtraBold', fontSize: 36 }}
+                className="text-[#F5E642]"
+              >
+                ₦{withdrawalAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+              </Typography>
+            </View>
+
+            <View className="h-[1px] bg-[#30363D] mb-4" />
+
+            <View className="flex-row justify-between items-center mb-4">
+              <Typography
+                style={{ fontFamily: 'Inter', fontSize: 14 }}
+                className="text-[#8B949E]"
+              >
+                Withdrawal Amount
+              </Typography>
+              <Typography
+                style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+                className="text-white"
+              >
+                ₦{withdrawalAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+              </Typography>
+            </View>
+
+            <View className="flex-row justify-between items-center mb-4">
+              <View className="flex-row items-center">
+                <Typography
+                  style={{ fontFamily: 'Inter', fontSize: 14 }}
+                  className="text-[#8B949E] mr-1"
+                >
+                  Processing Fee
+                </Typography>
+                <Info size={14} color="#8B949E" />
+              </View>
+              <Typography
+                style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+                className="text-white"
+              >
+                ₦{processingFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+              </Typography>
+            </View>
+
+            <View className="h-[1px] bg-[#30363D] mb-4" />
+
+            <View className="flex-row justify-between items-center">
+              <Typography
+                style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+                className="text-white"
+              >
+                Total to be Deducted
+              </Typography>
+              <Typography
+                style={{ fontFamily: 'Inter-Bold', fontSize: 16 }}
+                className="text-white"
+              >
+                ₦{totalDeduction.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+              </Typography>
+            </View>
           </View>
 
-          {/* Breakdown Card */}
-          <Card
-            variant="low"
-            padding={false}
-            className="overflow-hidden border border-outline-variant/10 relative"
-          >
-            <View className="absolute top-0 right-0 w-32 h-32 bg-primary-fixed/5 rounded-full" />
-
-            <View className="p-8 space-y-6">
-              {/* Main Amount */}
-              <View className="items-center py-6 border-b border-outline-variant/10">
+          {/* Bottom Half */}
+          <View className="bg-[#1C2128] p-5">
+            <View className="flex-row items-center mb-5">
+              <View className="w-10 h-10 bg-[#0D1117] rounded-lg items-center justify-center mr-3">
+                <Landmark size={20} color="#F5E642" />
+              </View>
+              <View>
                 <Typography
-                  variant="caption"
-                  className="text-on-surface-variant font-inter-medium mb-1"
+                  style={{ fontFamily: 'Inter', fontSize: 10 }}
+                  className="text-[#8B949E] uppercase mb-0.5"
                 >
-                  Final Withdrawal Amount
+                  DESTINATION BANK
                 </Typography>
-                <Typography variant="display" className="text-primary-fixed">
-                  ₦
-                  {withdrawalAmount.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                  })}
+                <Typography
+                  style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+                  className="text-white"
+                >
+                  {bankName}
                 </Typography>
               </View>
-
-              {/* Detailed Rows */}
-              <View className="space-y-4">
-                <View className="flex-row justify-between items-center">
-                  <Typography
-                    variant="body"
-                    className="text-on-surface-variant font-inter-medium"
-                  >
-                    Withdrawal Amount
-                  </Typography>
-                  <Typography
-                    variant="body"
-                    className="text-white font-inter-semibold"
-                  >
-                    ₦
-                    {withdrawalAmount.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                    })}
-                  </Typography>
-                </View>
-
-                <View className="flex-row justify-between items-center">
-                  <View className="flex-row items-center space-x-2">
-                    <Typography
-                      variant="body"
-                      className="text-on-surface-variant font-inter-medium"
-                    >
-                      Processing Fee
-                    </Typography>
-                    <Info size={14} color="#95917a" />
-                  </View>
-                  <Typography
-                    variant="body"
-                    className="text-accent-danger font-inter-semibold"
-                  >
-                    ₦
-                    {processingFee.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                    })}
-                  </Typography>
-                </View>
-
-                <View className="h-[1px] bg-outline-variant/20 my-2" />
-
-                <View className="flex-row justify-between items-center">
-                  <Typography
-                    variant="subheading"
-                    className="text-on-surface font-inter-bold"
-                  >
-                    Total to be Deducted
-                  </Typography>
-                  <Typography
-                    variant="heading"
-                    className="text-primary font-inter-extrabold text-xl"
-                  >
-                    ₦
-                    {totalDeduction.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                    })}
-                  </Typography>
-                </View>
-              </View>
             </View>
 
-            {/* Destination Info Section */}
-            <View className="bg-surface-container-high p-8 space-y-6">
-              <View className="flex-row items-center space-x-4">
-                <View className="w-12 h-12 rounded-xl bg-surface-bright items-center justify-center">
-                  <Landmark size={24} color="#F5E642" />
-                </View>
-                <View>
-                  <Typography
-                    variant="label-sm"
-                    className="text-on-surface-variant font-inter-bold mb-1"
-                  >
-                    Destination Bank
-                  </Typography>
-                  <Typography
-                    variant="subheading"
-                    className="text-white font-inter-bold"
-                  >
-                    {bankName || "Wema Bank"}
-                  </Typography>
-                </View>
+            <View className="flex-row items-center">
+              <View className="w-10 h-10 bg-[#0D1117] rounded-lg items-center justify-center mr-3">
+                <UserSquare2 size={20} color="#F5E642" />
               </View>
-
-              <View className="flex-row items-center space-x-4">
-                <View className="w-12 h-12 rounded-xl bg-surface-bright items-center justify-center">
-                  <UserSquare2 size={24} color="#F5E642" />
-                </View>
-                <View>
-                  <Typography
-                    variant="label-sm"
-                    className="text-on-surface-variant font-inter-bold mb-1"
-                  >
-                    Account Number
-                  </Typography>
-                  <Typography
-                    variant="subheading"
-                    className="text-white font-inter-bold tracking-widest"
-                  >
-                    {accountNumber || "0123456789"}
-                  </Typography>
-                </View>
+              <View>
+                <Typography
+                  style={{ fontFamily: 'Inter', fontSize: 10 }}
+                  className="text-[#8B949E] uppercase mb-0.5"
+                >
+                  ACCOUNT NUMBER
+                </Typography>
+                <Typography
+                  style={{ fontFamily: 'Inter-Bold', fontSize: 14, letterSpacing: 2 }}
+                  className="text-white"
+                >
+                  {accountNumber}
+                </Typography>
               </View>
             </View>
-          </Card>
+          </View>
+        </View>
 
-          {/* Security Note */}
-          <View className="p-5 bg-primary-container/5 rounded-xl border border-primary-container/10 flex-row space-x-4">
-            <ShieldCheck size={24} color="#F5E642" />
-            <View className="flex-1">
-              <Typography
-                variant="body"
-                className="text-white font-inter-bold mb-1"
-              >
-                Security Note
-              </Typography>
-              <Typography
-                variant="caption"
-                className="text-on-surface-variant leading-5"
-              >
-                Withdrawals are processed within minutes to your linked account.
-                Please ensure your bank details are correct to avoid delays.
-              </Typography>
-            </View>
+        {/* Security Note Card */}
+        <View className="bg-[#161B22] rounded-[24px] border border-[#F5E6421A] p-5 flex-row items-start">
+          <View className="w-8 h-8 rounded-full bg-[#F5E6421A] items-center justify-center mr-3">
+            <ShieldCheck size={18} color="#F5E642" />
+          </View>
+          <View className="flex-1">
+            <Typography
+              style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+              className="text-white mb-1"
+            >
+              Security Note
+            </Typography>
+            <Typography
+              style={{ fontFamily: 'Inter', fontSize: 12, lineHeight: 18 }}
+              className="text-[#8B949E]"
+            >
+              Withdrawals are processed within minutes to your linked account. Please ensure your bank details are correct to avoid delays.
+            </Typography>
           </View>
         </View>
       </ScrollView>
 
-      {/* Action Buttons */}
-      <View className="absolute bottom-10 left-4 right-4 bg-background-primary/80 pt-4 space-y-4">
-        <Button
-          label="Confirm Withdrawal"
+      {/* CTA Button */}
+      <View className="absolute bottom-10 left-4 right-4">
+        <TouchableOpacity 
           onPress={handleConfirm}
-          rightIcon={<ArrowRight size={20} color="#1f1c00" />}
-        />
-        <TouchableOpacity
+          disabled={withdrawMutation.isPending}
+          activeOpacity={0.8}
+          className="mb-4"
+        >
+          <LinearGradient
+            colors={['#F5E642', '#D9CC3C']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ 
+              height: 56, 
+              borderRadius: 14, 
+              flexDirection: 'row',
+              justifyContent: 'center', 
+              alignItems: 'center',
+              opacity: withdrawMutation.isPending ? 0.5 : 1
+            }}
+          >
+            {withdrawMutation.isPending ? (
+              <ActivityIndicator color="#0D1117" />
+            ) : (
+              <Typography
+                style={{ fontFamily: 'Inter-Bold', fontSize: 16 }}
+                className="text-[#0D1117]"
+              >
+                Confirm Withdrawal →
+              </Typography>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
           onPress={() => router.back()}
-          className="items-center py-2"
+          className="items-center"
         >
           <Typography
-            variant="body"
-            className="text-on-surface-variant font-inter-semibold"
+            style={{ fontFamily: 'Inter-Medium', fontSize: 14 }}
+            className="text-[#8B949E]"
           >
             Cancel Request
           </Typography>
