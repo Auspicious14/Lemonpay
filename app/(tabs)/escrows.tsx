@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -30,6 +30,8 @@ export default function EscrowsScreen() {
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL");
 
+  const isSeller = user?.account_type === "seller";
+
   const getStatusParam = (): EscrowStatus | undefined => {
     switch (activeFilter) {
       case "COMPLETED":
@@ -54,18 +56,29 @@ export default function EscrowsScreen() {
     refetch();
   }, [refetch]);
 
-  const filteredEscrows = (escrowsData?.data || []).filter((escrow) => {
+  const filteredEscrows = useMemo(() => {
+    const allEscrows = escrowsData?.data || [];
     if (activeFilter === "ACTIVE") {
-      return [
-        "locked",
-        "funded",
-        "awaiting_buyer_release",
-        "pending_seller_agreement",
-        "pending_buyer_confirmation",
-      ].includes(escrow.status);
+      return allEscrows.filter((escrow) =>
+        [
+          "locked",
+          "funded",
+          "awaiting_buyer_release",
+          "pending_seller_agreement",
+          "pending_buyer_confirmation",
+        ].includes(escrow.status)
+      );
     }
-    return true;
-  });
+    if (activeFilter === "COMPLETED") {
+      return allEscrows.filter((escrow) => escrow.status === "released");
+    }
+    if (activeFilter === "DISPUTED") {
+      return allEscrows.filter((escrow) =>
+        ["disputed", "resolved"].includes(escrow.status)
+      );
+    }
+    return allEscrows;
+  }, [escrowsData?.data, activeFilter]);
 
   const renderEscrowItem = ({ item }: { item: Escrow }) => {
     const badgeInfo = getStatusBadgeInfo(item.status);
@@ -85,7 +98,7 @@ export default function EscrowsScreen() {
 
     return (
       <TouchableOpacity
-        onPress={() => router.push(`/escrow/${item.id}`)}
+        onPress={() => router.push(`/escrow/${item.uuid}`)}
         className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 mb-4"
       >
         <View className="flex-row justify-between items-start mb-3">
@@ -184,7 +197,7 @@ export default function EscrowsScreen() {
 
           return (
             <TouchableOpacity
-              onPress={() => router.push(`/escrow/${item.id}`)}
+              onPress={() => router.push(`/escrow/${item.uuid}`)}
               className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 mb-4"
             >
               <View className="flex-row justify-between items-start mb-3">
@@ -288,7 +301,7 @@ export default function EscrowsScreen() {
                   ? 'Create your first escrow to start a secure transaction.' 
                   : 'Try changing your filter to see other escrows.'} 
               </Text> 
-              {activeFilter === 'ALL' && ( 
+              {!isSeller && activeFilter === 'ALL' && ( 
                 <TouchableOpacity 
                   onPress={() => router.push('/escrow/create')} 
                   style={{ overflow: 'hidden', borderRadius: 12 }} 
@@ -319,13 +332,15 @@ export default function EscrowsScreen() {
       />
 
       {/* FAB */}
-      <TouchableOpacity
-        className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-accent-primary items-center justify-center shadow-lg"
-        style={{ elevation: 5 }}
-        onPress={() => router.push("/escrow/create")}
-      >
-        <Plus size={32} color="#0D1117" />
-      </TouchableOpacity>
+      {!isSeller && (
+        <TouchableOpacity
+          className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-accent-primary items-center justify-center shadow-lg"
+          style={{ elevation: 5 }}
+          onPress={() => router.push("/escrow/create")}
+        >
+          <Plus size={32} color="#0D1117" />
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }

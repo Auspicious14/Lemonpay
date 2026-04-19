@@ -18,13 +18,15 @@ export const useMyEscrows = (status?: EscrowStatus, page = 1) => {
   });
 };
 
-export const useEscrowDetail = (id: number) => {
+export const useEscrowDetail = (id: string | number) => {
   return useQuery<Escrow>({
     queryKey: ["escrow", id],
     queryFn: async () => {
       console.log('[ESCROW DETAIL] fetching id:', id);
-      const response = await apiClient.get<ApiResponse<Escrow>>(ENDPOINTS.ESCROW.DETAIL(id));
-      console.log('[ESCROW DETAIL] response:', JSON.stringify(response.data));
+      const endpoint = ENDPOINTS.ESCROW.DETAIL(id);
+      console.log('[ESCROW DETAIL] using endpoint:', endpoint);
+      const response = await apiClient.get<ApiResponse<Escrow>>(endpoint);
+      console.log('[ESCROW DETAIL] response status:', response.status);
       return response.data.data;
     },
     staleTime: 15000,
@@ -58,7 +60,7 @@ export const useCreateEscrow = () => {
   });
 };
 
-export const useSellerAgreement = (id: number) => {
+export const useSellerAgreement = (id: string | number) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -75,7 +77,7 @@ export const useSellerAgreement = (id: number) => {
   });
 };
 
-export const useConfirmAgreement = (id: number) => {
+export const useConfirmAgreement = (id: string | number) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -92,7 +94,7 @@ export const useConfirmAgreement = (id: number) => {
   });
 };
 
-export const useFundEscrow = (id: number) => {
+export const useFundEscrow = (id: string | number) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -110,7 +112,7 @@ export const useFundEscrow = (id: number) => {
   });
 };
 
-export const useMarkDelivered = (id: number) => {
+export const useMarkDelivered = (id: string | number) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -124,7 +126,7 @@ export const useMarkDelivered = (id: number) => {
   });
 };
 
-export const useConfirmDelivery = (id: number) => {
+export const useConfirmDelivery = (id: string | number) => {
   const queryClient = useQueryClient();
 
   return useMutation({

@@ -40,14 +40,24 @@ export default function CreateEscrowScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const showToast = useToastStore((state) => state.show);
+
+  React.useEffect(() => {
+    if (user?.account_type === 'seller') {
+      showToast('Only buyers can create escrows', 'error');
+      router.back();
+    }
+  }, [user]);
+
   const [step, setStep] = useState(1);
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
   const [createdEscrow, setCreatedEscrow] = useState<{
     id: number;
+    uuid: string;
     share_link: string;
     amount: string;
     title: string;
     seller_identifier: string;
+    status: string;
   } | null>(null);
   const [isTermsAgreed, setIsTermsAgreed] = useState(false);
   const [termsFocused, setTermsFocused] = useState(false);
@@ -94,10 +104,12 @@ export default function CreateEscrowScreen() {
       });
       setCreatedEscrow({
         id: result.escrow.id,
+        uuid: result.escrow.uuid,
         share_link: result.share_link,
         amount: formData.amount,
         title: formData.title,
         seller_identifier: formData.seller_identifier,
+        status: result.escrow.status,
       });
       setIsSuccessModalVisible(true);
     } catch (error) {
@@ -1131,7 +1143,7 @@ export default function CreateEscrowScreen() {
               <TouchableOpacity 
                 onPress={() => {
                   setIsSuccessModalVisible(false);
-                  router.replace(`/escrow/${createdEscrow?.id}`);
+                  router.replace(`/escrow/${createdEscrow?.uuid}`);
                 }}
                 style={{ 
                   backgroundColor: "#21262D", 

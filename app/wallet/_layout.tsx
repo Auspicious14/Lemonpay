@@ -18,6 +18,7 @@ export default function WalletLayout() {
     >
       <Stack.Screen name="fund" />
       <Stack.Screen name="bank-transfer" />
+      <Stack.Screen name="history" />
     </Stack>
   );
 }

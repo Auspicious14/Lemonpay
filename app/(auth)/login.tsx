@@ -150,10 +150,10 @@ export default function LoginScreen() {
                 color={loginMode === "otp" ? "#0D1117" : "#8B949E"}
               />
               <Typography
-                style={[
-                  styles.tabText,
-                  loginMode === "otp" && styles.activeTabText,
-                ]}
+                variant="body"
+                className={
+                  loginMode === "otp" ? "!text-[#0D1117]" : "!text-[#8B949E]"
+                }
               >
                 OTP Login
               </Typography>
@@ -169,10 +169,10 @@ export default function LoginScreen() {
                 color={loginMode === "pin" ? "#0D1117" : "#8B949E"}
               />
               <Typography
-                style={[
-                  styles.tabText,
-                  loginMode === "pin" && styles.activeTabText,
-                ]}
+                variant="body"
+                className={
+                  loginMode === "pin" ? "!text-[#0D1117]" : "!text-[#8B949E]"
+                }
               >
                 PIN Access
               </Typography>
@@ -183,7 +183,9 @@ export default function LoginScreen() {
           <Animated.View layout={Layout.springify()} style={styles.formCard}>
             {/* Email Input */}
             <View style={styles.inputWrapper}>
-              <Typography style={styles.label}>EMAIL ADDRESS</Typography>
+              <Typography variant="label" className="!text-primary-fixed mb-2">
+                EMAIL ADDRESS
+              </Typography>
               <View style={styles.inputContainer}>
                 <Ionicons name="at-outline" size={20} color="#484F58" />
                 <TextInput
@@ -205,7 +207,12 @@ export default function LoginScreen() {
                 exiting={FadeOut.duration(200)}
                 style={styles.inputWrapper}
               >
-                <Typography style={styles.label}>SECURE PIN</Typography>
+                <Typography
+                  variant="label"
+                  className="!text-primary-fixed mb-2"
+                >
+                  SECURE PIN
+                </Typography>
                 <View style={styles.inputContainer}>
                   <Ionicons name="key-outline" size={20} color="#484F58" />
                   <TextInput
@@ -247,7 +254,7 @@ export default function LoginScreen() {
                   },
                 ]}
               >
-                <Typography style={styles.buttonText}>
+                <Typography variant="body" className="!text-black">
                   {loginMode === "otp"
                     ? isOtpRequestPending
                       ? "Sending Code..."
@@ -262,11 +269,9 @@ export default function LoginScreen() {
 
             {/* Forgot PIN / Support */}
             <TouchableOpacity style={{ marginTop: 24, alignItems: "center" }}>
-              <Typography
-                style={{ color: "#484F58", fontSize: 13, fontWeight: "600" }}
-              >
+              <Typography variant="caption" className="!text-[#8B949E]">
                 Having trouble?{" "}
-                <Typography style={{ color: "#F5E642" }}>
+                <Typography variant="caption" className="!text-primary-fixed">
                   Contact Support
                 </Typography>
               </Typography>
@@ -278,9 +283,9 @@ export default function LoginScreen() {
             onPress={() => router.push("/(auth)/register")}
             style={styles.registerLink}
           >
-            <Typography style={{ color: "#8B949E", fontSize: 14 }}>
+            <Typography variant="caption" className="!text-[#8B949E]">
               Don't have an account?{" "}
-              <Typography style={{ color: "#FFFFFF", fontWeight: "700" }}>
+              <Typography variant="caption" className="!text-primary-fixed">
                 Join LemonPay
               </Typography>
             </Typography>

@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TextInput,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/ui/Screen";
@@ -64,9 +65,9 @@ export default function PinLoginScreen() {
             </Typography>
           </View>
 
-          <View className="space-y-8">
-            <Input
-              label="Email Address"
+          <View style={{gap:6}}>
+            <Typography variant="label-sm" className="text-[#8B949E]">Email Address</Typography>
+            <TextInput
               placeholder="name@example.com"
               value={email}
               onChangeText={setEmail}
@@ -77,7 +78,7 @@ export default function PinLoginScreen() {
             <View>
               <Typography
                 variant="label"
-                className="text-white/60 mb-4 text-center"
+                className="!text-white/60 mb-4 text-center"
               >
                 Enter your 4-digit PIN
               </Typography>

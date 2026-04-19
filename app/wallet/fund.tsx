@@ -64,22 +64,30 @@ export default function FundWalletScreen() {
         email: user?.email || "",
       });
 
+      console.log('[FUND] Received response:', JSON.stringify(response));
+
+      if (!response.authorization_url) {
+        showToast("Payment link not found. Please try again.", "error");
+        return;
+      }
+
       setIsAmountSheetVisible(false);
 
+      // openAuthSessionAsync is better for "wait until dismissed" behavior
+      // even if the redirect doesn't perfectly match.
       const result = await WebBrowser.openAuthSessionAsync(
         response.authorization_url,
         "lemonpay://",
       );
 
-      if (result.type === "success" || result.type === "dismiss") {
-        setTimeout(() => {
-          router.replace("/(tabs)/wallet");
-          showToast(
-            "Transaction initiated. Your balance will update shortly.",
-            "success",
-          );
-        }, 2000);
-      }
+      console.log('[FUND] Auth session result:', result.type);
+
+      // Once the session is over (redirected or dismissed), navigate to wallet
+      router.replace("/(tabs)/wallet");
+      showToast(
+        "Transaction initiated. Your balance will update shortly.",
+        "success",
+      );
     } catch (err: any) {
       showToast(
         err.response?.data?.message || "Payment initialization failed",

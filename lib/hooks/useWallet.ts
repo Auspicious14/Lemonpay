@@ -32,19 +32,26 @@ export const useFundWallet = () => {
         ENDPOINTS.WALLET.FUND,
         { amount, email },
       );
-      console.log('[FUND WALLET] response:', JSON.stringify(response.data));
       
-      // The axios interceptor likely returns response.data (outer wrapper removed)
-      // So response here = { success, message, data: innerWrapper }
-      // innerWrapper = { success, message, data: actualData }
-      const actualData = response.data?.data?.data ?? response.data?.data ?? response.data;
+      // Paystack response structure is usually { status, message, data: { authorization_url, ... } }
+      // Our backend wrapper is { success, message, data: { ... } }
+      // So the combined structure might be { success: true, data: { status: "success", data: { authorization_url: "..." } } }
       
-      console.log('[FUND WALLET] extracted actualData:', JSON.stringify(actualData));
+      console.log('[FUND WALLET] raw response data:', JSON.stringify(response.data));
+      
+      const data = response.data?.data;
+      const paystackData = data?.data || data;
+      
+      console.log('[FUND WALLET] extracted paystackData:', JSON.stringify(paystackData));
+      
+      if (!paystackData?.authorization_url) {
+        throw new Error("Could not generate payment link. Please try again.");
+      }
       
       return {
-        authorization_url: actualData.authorization_url,
-        access_code: actualData.access_code,
-        reference: actualData.reference,
+        authorization_url: paystackData.authorization_url,
+        access_code: paystackData.access_code,
+        reference: paystackData.reference,
       } as FundWalletResponse;
     },
     onSuccess: () => {

@@ -40,22 +40,21 @@ export default function EscrowDetailScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const showToast = useToastStore((state) => state.show);
-  const escrowId = parseInt(id || "0", 10);
 
-  const { data: escrow, isLoading, isError, error, refetch } = useEscrowDetail(escrowId);
+  const { data: escrow, isLoading, isError, error, refetch } = useEscrowDetail(id || "");
   const { data: balanceData } = useWalletBalance();
 
   const [isSellerTermsModalVisible, setIsSellerTermsModalVisible] = useState(false);
   const [sellerTerms, setSellerTerms] = useState("");
 
-  const sellerAgreementMutation = useSellerAgreement(escrowId);
-  const confirmAgreementMutation = useConfirmAgreement(escrowId);
-  const fundEscrowMutation = useFundEscrow(escrowId);
-  const markDeliveredMutation = useMarkDelivered(escrowId);
-  const confirmDeliveryMutation = useConfirmDelivery(escrowId);
+  const sellerAgreementMutation = useSellerAgreement(id || "");
+  const confirmAgreementMutation = useConfirmAgreement(id || "");
+  const fundEscrowMutation = useFundEscrow(id || "");
+  const markDeliveredMutation = useMarkDelivered(id || "");
+  const confirmDeliveryMutation = useConfirmDelivery(id || "");
 
   // Add validation
-  if (!id || isNaN(escrowId) || escrowId === 0) {
+  if (!id) {
     return (
       <Screen showBackButton title="Escrow Detail">
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -63,7 +62,7 @@ export default function EscrowDetailScreen() {
             Escrow not found
           </Text>
           <Text style={{ fontFamily: 'Inter', color: '#8B949E', fontSize: 14, textAlign: 'center' }}>
-            Invalid escrow ID: {id}
+            Invalid escrow identifier
           </Text>
         </View>
       </Screen>
@@ -679,7 +678,7 @@ export default function EscrowDetailScreen() {
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  onPress={() => router.push(`/escrow/${escrowId}/dispute`)}
+                  onPress={() => router.push(`/escrow/${id}/dispute`)}
                   className="h-14 rounded-[20px] border border-[#FF4D4F]/30 items-center justify-center flex-row"
                 >
                   <Gavel size={18} color="#FF4D4F" />

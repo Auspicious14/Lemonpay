@@ -35,12 +35,11 @@ const DISPUTE_REASONS = [
 ] as const;
 
 export default function DisputeScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { show: showToast } = useToastStore();
-  const escrowId = parseInt(id as string);
 
-  const { data: escrow, isLoading: isEscrowLoading } = useEscrowDetail(escrowId);
+  const { data: escrow, isLoading: isEscrowLoading } = useEscrowDetail(id || "");
   const { data: disputes } = useDisputes();
   
   // Find if there's an existing dispute for this escrow

@@ -140,20 +140,26 @@ export default function RegisterScreen() {
           {/* Top Brand */}
           <View className="flex-row items-center mb-6">
             <Ionicons name="shield-checkmark" size={20} color="#F5E642" />
-            <Typography style={styles.brandText}>LEMONPAY</Typography>
+            <Typography variant="subheading" className="!text-primary-fixed">
+              LEMONPAY
+            </Typography>
           </View>
 
           {/* Progress */}
           <StepProgressBar currentStep={1} totalSteps={3} />
 
           {/* Heading */}
-          <Typography style={styles.heading}>Personal Details</Typography>
+          <Typography variant="display" className="mb-4">
+            Personal Details
+          </Typography>
 
           {/* Form Card */}
           <View style={styles.card}>
             {/* First Name */}
             <View style={{ marginBottom: 20 }}>
-              <Typography style={styles.label}>FIRST NAME</Typography>
+              <Typography variant="label" className="!text-primary-fixed mb-2">
+                FIRST NAME
+              </Typography>
               <View style={styles.inputContainer}>
                 <TextInput
                   placeholder="e.g. Chinedu"
@@ -167,7 +173,9 @@ export default function RegisterScreen() {
 
             {/* Last Name */}
             <View style={{ marginBottom: 20 }}>
-              <Typography style={styles.label}>LAST NAME</Typography>
+              <Typography variant="label" className="!text-primary-fixed mb-2">
+                LAST NAME
+              </Typography>
               <View style={styles.inputContainer}>
                 <TextInput
                   placeholder="e.g. Okafor"
@@ -181,7 +189,9 @@ export default function RegisterScreen() {
 
             {/* Email */}
             <View style={{ marginBottom: 20 }}>
-              <Typography style={styles.label}>EMAIL ADDRESS</Typography>
+              <Typography variant="label" className="!text-primary-fixed mb-2">
+                EMAIL ADDRESS
+              </Typography>
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="mail-outline"
@@ -203,7 +213,9 @@ export default function RegisterScreen() {
 
             {/* Phone */}
             <View style={{ marginBottom: 20 }}>
-              <Typography style={styles.label}>PHONE NUMBER</Typography>
+              <Typography variant="label" className="!text-primary-fixed mb-2">
+                PHONE NUMBER
+              </Typography>
               <View style={styles.inputContainer}>
                 <View className="flex-row items-center pl-4 pr-3 border-r border-[#30363D] h-full">
                   <Typography style={{ color: "#8B949E", fontSize: 14 }}>
@@ -223,7 +235,9 @@ export default function RegisterScreen() {
 
             {/* DOB (Proper UI) */}
             <View style={{ marginBottom: 24 }}>
-              <Typography style={styles.label}>DATE OF BIRTH</Typography>
+              <Typography variant="label" className="!text-primary-fixed mb-2">
+                DATE OF BIRTH
+              </Typography>
               <TouchableOpacity
                 onPress={openPicker}
                 activeOpacity={0.7}
@@ -275,8 +289,10 @@ export default function RegisterScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.button}
             >
-              <View className="flex-row items-center">
-                <Typography style={styles.buttonText}>Continue</Typography>
+              <View className="flex-row gap-2 items-center">
+                <Typography variant="body" className="!text-black">
+                  Continue
+                </Typography>
                 <Ionicons name="arrow-forward" size={18} color="#0D1117" />
               </View>
             </LinearGradient>
@@ -289,10 +305,14 @@ export default function RegisterScreen() {
             onPress={() => router.back()}
             className="flex-row items-center"
           >
-            <Typography style={styles.bottomLink}>← BACK</Typography>
+            <Typography variant="caption" className="!text-sm">
+              ← BACK
+            </Typography>
           </TouchableOpacity>
           <TouchableOpacity className="flex-row items-center">
-            <Typography style={styles.bottomLink}>? HELP</Typography>
+            <Typography variant="caption" className="!text-sm">
+              ? HELP
+            </Typography>
           </TouchableOpacity>
         </View>
 
@@ -473,16 +493,11 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 56,
-    borderRadius: 28,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  buttonText: {
-    color: "#0D1117",
-    fontSize: 16,
-    fontWeight: "700",
-    marginRight: 8,
-  },
+
   bottomBar: {
     flexDirection: "row",
     justifyContent: "space-between",

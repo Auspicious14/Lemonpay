@@ -27,7 +27,7 @@ export const useMyBankAccounts = () => {
 interface VerifyAccountParams {
   bank_code: string;
   account_number: string;
-  account_name: string;
+  account_name?: string;
 }
 
 export const useVerifyAccount = () => {

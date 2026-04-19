@@ -1,8 +1,18 @@
-import React, { useState, useRef, useMemo, useEffect } from "react";
-import { View, ScrollView, TouchableOpacity, TextInput, FlatList, Modal, Text, ActivityIndicator } from "react-native";
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  FlatList,
+  Modal,
+  Text,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { useRouter } from "expo-router";
 import {
-  ArrowLeft,
   Info,
   Landmark,
   Plus,
@@ -11,43 +21,51 @@ import {
   ChevronDown,
   Search,
   X,
+  AlertCircle,
 } from "lucide-react-native";
-import BottomSheet from "@gorhom/bottom-sheet";
 import { Screen } from "@/components/ui/Screen";
 import { Typography } from "@/components/ui/Typography";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { CustomBottomSheet } from "@/components/ui/BottomSheet";
-import { useWalletBalance } from "@/lib/hooks/useWallet";
-import { useBanks, useMyBankAccounts, useVerifyAccount, useAddBankAccount, useWithdraw } from "@/lib/hooks/useBankAccount";
-import { formatCurrency } from "@/lib/utils/format";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { Bank, BankAccount } from "@/types/api";
+import { useWalletBalance } from "@/lib/hooks/useWallet";
+import {
+  useBanks,
+  useMyBankAccounts,
+  useVerifyAccount,
+  useAddBankAccount,
+  useWithdraw,
+} from "@/lib/hooks/useBankAccount";
+import { formatCurrency } from "@/lib/utils/format";
+import { useToastStore } from "@/store/useToastStore";
+import { Bank } from "@/types/api";
 
 const QUICK_AMOUNTS = ["5000", "10000", "20000", "50000"];
 
 export default function WithdrawFundsScreen() {
   const router = useRouter();
+  const showToast = useToastStore((state) => state.show);
   const [step, setStep] = useState(1);
   const [amount, setAmount] = useState("");
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<number | null>(null);
-  
+
   // Step 1: Add Bank Modal State
   const [isAddBankModalVisible, setIsAddBankModalVisible] = useState(false);
   const [bankSearch, setBankSearch] = useState("");
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
   const [isBankPickerVisible, setIsBankPickerVisible] = useState(false);
   const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
   const [verifiedName, setVerifiedName] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
   const [withdrawReference, setWithdrawReference] = useState("");
+  const [errors, setErrors] = useState<{ accountNumber?: string; accountName?: string; bank?: string }>({});
 
   const { data: balanceData } = useWalletBalance();
   const { data: myBankAccounts, isLoading: isAccountsLoading } = useMyBankAccounts();
   const { data: allBanks } = useBanks();
-  
+
   const verifyMutation = useVerifyAccount();
   const addBankAccountMutation = useAddBankAccount();
   const withdrawMutation = useWithdraw();
@@ -58,6 +76,7 @@ export default function WithdrawFundsScreen() {
       const verify = async () => {
         setIsVerifying(true);
         setVerifiedName(null);
+        setAccountName("");
         try {
           const result = await verifyMutation.mutateAsync({
             bank_code: selectedBank.code,
@@ -65,9 +84,14 @@ export default function WithdrawFundsScreen() {
             account_name: "",
           });
           setVerifiedName(result.verified_name);
-        } catch (err) {
+          setAccountName(result.verified_name);
+          setErrors(prev => ({ ...prev, accountNumber: undefined }));
+        } catch (err: any) {
           setVerifiedName(null);
-          // Toast is handled by store or globally
+          setErrors(prev => ({
+            ...prev,
+            accountNumber: err.response?.data?.message || "Could not verify account number"
+          }));
         } finally {
           setIsVerifying(false);
         }
@@ -82,7 +106,7 @@ export default function WithdrawFundsScreen() {
 
   const filteredBanks = useMemo(() => {
     if (!allBanks) return [];
-    return allBanks.filter(b => 
+    return allBanks.filter(b =>
       b.name.toLowerCase().includes(bankSearch.toLowerCase())
     );
   }, [allBanks, bankSearch]);
@@ -91,22 +115,40 @@ export default function WithdrawFundsScreen() {
     return myBankAccounts?.find(a => a.id === selectedBankAccountId);
   }, [myBankAccounts, selectedBankAccountId]);
 
+  const validateBankForm = () => {
+    const newErrors: typeof errors = {};
+    if (!selectedBank) newErrors.bank = "Please select a bank";
+    if (accountNumber.length !== 10) newErrors.accountNumber = "Account number must be 10 digits";
+    if (!accountName.trim()) newErrors.accountName = "Account name is required";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSaveBank = async () => {
-    if (!selectedBank || !verifiedName) return;
+    if (!validateBankForm()) {
+      showToast("Please fix the errors in the form", "error");
+      return;
+    }
+
     try {
       const result = await addBankAccountMutation.mutateAsync({
-        bank_code: selectedBank.code,
+        bank_code: selectedBank!.code,
         account_number: accountNumber,
-        account_name: verifiedName,
+        account_name: accountName,
       });
       setSelectedBankAccountId(result.id);
       setIsAddBankModalVisible(false);
+      showToast("Bank account added successfully", "success");
       // Reset form
       setSelectedBank(null);
       setAccountNumber("");
+      setAccountName("");
       setVerifiedName(null);
-    } catch (error) {
+      setErrors({});
+    } catch (error: any) {
       console.error("Add bank failed", error);
+      showToast(error.response?.data?.message || "Failed to add bank account", "error");
     }
   };
 
@@ -119,22 +161,24 @@ export default function WithdrawFundsScreen() {
       });
       setWithdrawReference(result.reference);
       setIsSuccessModalVisible(true);
+      showToast("Withdrawal successful", "success");
     } catch (error: any) {
       console.error("Withdrawal failed", error);
+      showToast(error.message || "Withdrawal failed", "error");
     }
   };
 
   const renderStep1 = () => (
     <View className="space-y-6">
       <View className="flex-row justify-between items-center px-1">
-        <Typography 
+        <Typography
           style={{ fontFamily: 'Inter' }}
           variant="label-sm" className="text-[#8B949E]"
         >
           Select Destination
         </Typography>
         <TouchableOpacity onPress={() => setIsAddBankModalVisible(true)}>
-          <Typography 
+          <Typography
             style={{ fontFamily: 'Inter-Bold' }}
             variant="label-sm" className="text-[#F5E642]"
           >
@@ -146,18 +190,18 @@ export default function WithdrawFundsScreen() {
       {isAccountsLoading ? (
         <LoadingSpinner />
       ) : myBankAccounts?.length === 0 ? (
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => setIsAddBankModalVisible(true)}
-          className="bg-surface-container-highest rounded-2xl p-8 items-center border border-dashed border-outline"
+          className="bg-[#161B22] rounded-2xl p-8 items-center border border-dashed border-[#30363D]"
         >
           <Plus size={32} color="#8B949E" />
-          <Typography 
+          <Typography
             style={{ fontFamily: 'Inter-Medium' }}
             className="text-[#8B949E] mt-2"
           >
             No bank accounts linked
           </Typography>
-          <Typography 
+          <Typography
             style={{ fontFamily: 'Inter' }}
             variant="caption" className="text-[#484f58]"
           >
@@ -182,13 +226,13 @@ export default function WithdrawFundsScreen() {
                   <Landmark size={24} color="#F5E642" />
                 </View>
                 <View className="ml-4">
-                  <Typography 
+                  <Typography
                     style={{ fontFamily: 'Inter-Bold' }}
                     className="text-white"
                   >
                     {account.bank_name}
                   </Typography>
-                  <Typography 
+                  <Typography
                     style={{ fontFamily: 'Inter' }}
                     variant="caption" className="text-[#8B949E]"
                   >
@@ -217,13 +261,13 @@ export default function WithdrawFundsScreen() {
     <View className="space-y-8">
       {/* Balance Card */}
       <Card variant="low" className="p-6 bg-[#161B22]/30">
-        <Typography 
+        <Typography
           style={{ fontFamily: 'Inter' }}
           variant="label-sm" className="text-[#8B949E] mb-1"
         >
           Available Balance
         </Typography>
-        <Typography 
+        <Typography
           style={{ fontFamily: 'Inter-ExtraBold' }}
           variant="display" className="text-[#F5E642]"
         >
@@ -233,7 +277,7 @@ export default function WithdrawFundsScreen() {
 
       {/* Amount Input */}
       <View className="space-y-4">
-        <Typography 
+        <Typography
           style={{ fontFamily: 'Inter' }}
           variant="label-sm" className="text-[#8B949E] px-1"
         >
@@ -241,7 +285,7 @@ export default function WithdrawFundsScreen() {
         </Typography>
         <View className="relative">
           <View className="absolute left-6 top-1/2 -translate-y-1/2 z-10">
-            <Typography 
+            <Typography
               style={{ fontFamily: 'Inter-Bold' }}
               className="text-[#F5E642] text-2xl"
             >
@@ -263,12 +307,12 @@ export default function WithdrawFundsScreen() {
         {/* Quick Amounts */}
         <View className="flex-row gap-x-2">
           {QUICK_AMOUNTS.map(val => (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={val}
               onPress={() => setAmount(val)}
               className="flex-1 bg-[#161B22] py-3 rounded-xl border border-[#30363D]/20 items-center"
             >
-              <Typography 
+              <Typography
                 style={{ fontFamily: 'Inter-Bold' }}
                 className="text-white text-xs"
               >
@@ -283,38 +327,38 @@ export default function WithdrawFundsScreen() {
 
   const renderStep3 = () => (
     <View className="space-y-8">
-      <Typography 
+      <Typography
         style={{ fontFamily: 'Inter-Bold' }}
         variant="heading" className="text-white text-center"
       >
         Confirm Withdrawal
       </Typography>
-      
+
       <View className="bg-[#161B22]/30 p-6 space-y-6">
         <View className="items-center mb-4">
-          <Typography 
+          <Typography
             style={{ fontFamily: 'Inter' }}
             variant="label-sm" className="text-[#8B949E] uppercase tracking-widest"
           >
             Withdrawal Amount
           </Typography>
-          <Typography 
+          <Typography
             style={{ fontFamily: 'Inter-ExtraBold' }}
             variant="display" className="text-[#F5E642] mt-1"
           >
             {formatCurrency(amount)}
           </Typography>
         </View>
-        
+
         <View className="space-y-4">
           <View className="flex-row justify-between border-t border-[#30363D]/10 pt-4">
-            <Typography 
+            <Typography
               style={{ fontFamily: 'Inter' }}
               className="text-[#8B949E]"
             >
               Bank
             </Typography>
-            <Typography 
+            <Typography
               style={{ fontFamily: 'Inter-Bold' }}
               className="text-white"
             >
@@ -322,13 +366,13 @@ export default function WithdrawFundsScreen() {
             </Typography>
           </View>
           <View className="flex-row justify-between">
-            <Typography 
+            <Typography
               style={{ fontFamily: 'Inter' }}
               className="text-[#8B949E]"
             >
               Account Number
             </Typography>
-            <Typography 
+            <Typography
               style={{ fontFamily: 'Inter-Bold' }}
               className="text-white"
             >
@@ -336,13 +380,13 @@ export default function WithdrawFundsScreen() {
             </Typography>
           </View>
           <View className="flex-row justify-between">
-            <Typography 
+            <Typography
               style={{ fontFamily: 'Inter' }}
               className="text-[#8B949E]"
             >
               Account Name
             </Typography>
-            <Typography 
+            <Typography
               style={{ fontFamily: 'Inter-Bold' }}
               className="text-white uppercase"
             >
@@ -350,13 +394,13 @@ export default function WithdrawFundsScreen() {
             </Typography>
           </View>
           <View className="flex-row justify-between">
-            <Typography 
+            <Typography
               style={{ fontFamily: 'Inter' }}
               className="text-[#8B949E]"
             >
               Fee
             </Typography>
-            <Typography 
+            <Typography
               style={{ fontFamily: 'Inter-Bold' }}
               className="text-white"
             >
@@ -368,7 +412,7 @@ export default function WithdrawFundsScreen() {
 
       <View className="bg-[#161B22]/30 p-4 rounded-xl flex-row items-center">
         <Info size={16} color="#8B949E" />
-        <Typography 
+        <Typography
           style={{ fontFamily: 'Inter' }}
           variant="caption" className="text-[#8B949E] ml-2 flex-1"
         >
@@ -425,131 +469,223 @@ export default function WithdrawFundsScreen() {
         visible={isAddBankModalVisible}
         animationType="slide"
         transparent={true}
+        statusBarTranslucent
       >
-        <View className="flex-1 bg-black/80 justify-end">
-          <View className="bg-[#161B22] rounded-t-3xl p-6 h-[80%]">
-            <View className="flex-row justify-between items-center mb-6">
-              <Typography variant="subheading" className="text-white">Add Bank Account</Typography>
-              <TouchableOpacity onPress={() => setIsAddBankModalVisible(false)}>
-                <X size={24} color="white" />
-              </TouchableOpacity>
-            </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View className="flex-1 bg-black/70 justify-end">
+            <View className="bg-[#0D1117] rounded-t-[32px] border-t border-[#30363D] p-6 max-h-[90%]">
+              <View className="w-12 h-1 bg-[#30363D] rounded-full self-center mb-6" />
 
-            <ScrollView className="flex-1 space-y-6">
-              {/* Select Bank */}
-              <View className="space-y-2">
-                <Typography variant="label-sm" className="text-outline">Select Bank</Typography>
-                <TouchableOpacity 
-                  onPress={() => setIsBankPickerVisible(true)}
-                  className="bg-surface-container-high rounded-xl px-4 py-4 flex-row justify-between items-center"
-                >
-                  <Typography className="text-white font-inter-medium">
-                    {selectedBank ? selectedBank.name : "Choose a bank"}
+              <View className="flex-row justify-between items-center mb-8">
+                <View>
+                  <Typography variant="heading" className="text-white text-2xl">Add Bank</Typography>
+                  <Typography variant="caption" className="text-[#8B949E] mt-1">
+                    Enter your NGN bank details
                   </Typography>
-                  <ChevronDown size={20} color="#8B949E" />
+                </View>
+                <TouchableOpacity
+                  onPress={() => setIsAddBankModalVisible(false)}
+                  className="w-10 h-10 bg-[#161B22] rounded-full items-center justify-center border border-[#30363D]"
+                >
+                  <X size={20} color="white" />
                 </TouchableOpacity>
               </View>
 
-              {/* Account Number */}
-              <View className="space-y-2">
-                <Typography variant="label-sm" className="text-outline">Account Number</Typography>
-                <View className="relative">
-                  <Input
-                    placeholder="10-digit account number"
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    value={accountNumber}
-                    onChangeText={setAccountNumber}
-                    className="mb-0 pr-16"
-                  />
-                  {isVerifying && (
-                    <View className="absolute right-4 top-4">
-                      <ActivityIndicator size="small" color="#F5E642" />
+              <ScrollView
+                className="space-y-6"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
+                {/* Select Bank */}
+                <View className="space-y-3">
+                  <Typography variant="label-sm" className="text-[#8B949E] px-1 uppercase tracking-widest">
+                    Financial Institution
+                  </Typography>
+                  <TouchableOpacity
+                    onPress={() => setIsBankPickerVisible(true)}
+                    activeOpacity={0.7}
+                    className={`bg-[#161B22] rounded-2xl px-5 py-4 flex-row justify-between items-center border ${
+                      errors.bank ? "border-red-500/50" : "border-[#30363D]"
+                    }`}
+                  >
+                    <View className="flex-row items-center flex-1">
+                      <View className="w-8 h-8 bg-[#F5E642]/10 rounded-lg items-center justify-center mr-3">
+                        <Landmark size={18} color="#F5E642" />
+                      </View>
+                      <Typography className={`font-inter-medium flex-1 ${selectedBank ? "text-white" : "text-[#484f58]"}`}>
+                        {selectedBank ? selectedBank.name : "Select your bank"}
+                      </Typography>
+                    </View>
+                    <ChevronDown size={20} color="#8B949E" />
+                  </TouchableOpacity>
+                  {errors.bank && (
+                    <View className="flex-row items-center mt-1 px-1">
+                      <AlertCircle size={12} color="#EF4444" />
+                      <Typography className="text-red-500 text-[10px] ml-1">{errors.bank}</Typography>
                     </View>
                   )}
                 </View>
 
-                {isVerifying && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                    <ActivityIndicator size="small" color="#F5E642" />
-                    <Text style={{ fontFamily: 'Inter', color: '#8B949E', fontSize: 12 }}>
-                      Verifying account...
-                    </Text>
+                {/* Account Number */}
+                <View className="space-y-3">
+                  <Typography variant="label-sm" className="text-[#8B949E] px-1 uppercase tracking-widest">
+                    Account Number
+                  </Typography>
+                  <View className="relative">
+                    <TextInput
+                      placeholder="e.g. 0123456789"
+                      placeholderTextColor="#484f58"
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      value={accountNumber}
+                      onChangeText={(text) => {
+                        setAccountNumber(text);
+                        if (errors.accountNumber) setErrors(prev => ({ ...prev, accountNumber: undefined }));
+                      }}
+                      style={{ fontFamily: 'Inter-Medium' }}
+                      className={`w-full bg-[#161B22] rounded-2xl py-4 px-5 text-white border ${
+                        errors.accountNumber ? "border-red-500/50" : "border-[#30363D]"
+                      }`}
+                    />
+                    {isVerifying && (
+                      <View className="absolute right-5 top-4">
+                        <ActivityIndicator size="small" color="#F5E642" />
+                      </View>
+                    )}
                   </View>
-                )}
+                  {errors.accountNumber && (
+                    <View className="flex-row items-center mt-1 px-1">
+                      <AlertCircle size={12} color="#EF4444" />
+                      <Typography className="text-red-500 text-[10px] ml-1">{errors.accountNumber}</Typography>
+                    </View>
+                  )}
+                </View>
 
-                {verifiedName && !isVerifying && (
-                  <View style={{ 
-                    flexDirection: 'row', alignItems: 'center', 
-                    gap: 6, marginTop: 8, 
-                    backgroundColor: 'rgba(0,200,150,0.1)', 
-                    padding: 10, borderRadius: 8 
-                  }}>
-                    <CheckCircle2 size={14} color="#00C896" />
-                    <Text style={{ fontFamily: 'Inter-Bold', color: '#00C896', fontSize: 13 }}>
-                      {verifiedName}
-                    </Text>
+                {/* Account Name */}
+                <View className="space-y-3">
+                  <Typography variant="label-sm" className="text-[#8B949E] px-1 uppercase tracking-widest">
+                    Account Name
+                  </Typography>
+                  <TextInput
+                    placeholder="Beneficiary Name"
+                    placeholderTextColor="#484f58"
+                    value={accountName}
+                    onChangeText={(text) => {
+                      setAccountName(text);
+                      if (errors.accountName) setErrors(prev => ({ ...prev, accountName: undefined }));
+                    }}
+                    editable={!isVerifying}
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className={`w-full bg-[#161B22] rounded-2xl py-4 px-5 text-white border ${
+                      errors.accountName ? "border-red-500/50" : "border-[#30363D]"
+                    } ${isVerifying ? "opacity-50" : ""}`}
+                  />
+                  {verifiedName && !isVerifying && (
+                    <View className="flex-row items-center mt-1 px-1">
+                      <CheckCircle2 size={12} color="#00C896" />
+                      <Typography className="text-[#00C896] text-[10px] ml-1">Account verified successfully</Typography>
+                    </View>
+                  )}
+                  {errors.accountName && (
+                    <View className="flex-row items-center mt-1 px-1">
+                      <AlertCircle size={12} color="#EF4444" />
+                      <Typography className="text-red-500 text-[10px] ml-1">{errors.accountName}</Typography>
+                    </View>
+                  )}
+                </View>
+
+                <View className="pt-8">
+                  <Button
+                    label="Link Bank Account"
+                    onPress={handleSaveBank}
+                    disabled={addBankAccountMutation.isPending || isVerifying}
+                    loading={addBankAccountMutation.isPending}
+                    className="h-16 rounded-2xl"
+                  />
+
+                  <View className="flex-row items-center justify-center mt-6">
+                    <Lock size={12} color="#8B949E" />
+                    <Typography variant="caption" className="text-[#8B949E] ml-1.5">
+                      Encrypted and secure by LemonPay
+                    </Typography>
                   </View>
-                )}
-              </View>
-
-              <View className="pt-6">
-                <Button
-                  label="Save Bank Account"
-                  onPress={handleSaveBank}
-                  disabled={!verifiedName || addBankAccountMutation.isPending || isVerifying}
-                  loading={addBankAccountMutation.isPending}
-                />
-              </View>
-            </ScrollView>
+                </View>
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
 
         {/* Bank Picker Nested Modal */}
         <Modal
           visible={isBankPickerVisible}
-          animationType="fade"
+          animationType="slide"
           transparent={true}
+          statusBarTranslucent
         >
-          <View className="flex-1 bg-black/90 p-6 pt-20">
-            <View className="flex-row justify-between items-center mb-6">
-              <Typography variant="heading" className="text-white">Select Bank</Typography>
-              <TouchableOpacity onPress={() => setIsBankPickerVisible(false)}>
-                <X size={28} color="white" />
-              </TouchableOpacity>
-            </View>
-            
-            <View className="relative mb-6">
-              <View className="absolute left-4 top-4 z-10">
-                <Search size={20} color="#8B949E" />
+          <View className="flex-1 bg-[#0D1117] pt-14">
+            <View className="px-6 pb-6 border-b border-[#30363D]">
+              <View className="flex-row justify-between items-center mb-6">
+                <Typography variant="heading" className="text-white text-2xl">Select Bank</Typography>
+                <TouchableOpacity
+                  onPress={() => setIsBankPickerVisible(false)}
+                  className="w-10 h-10 bg-[#161B22] rounded-full items-center justify-center border border-[#30363D]"
+                >
+                  <X size={20} color="white" />
+                </TouchableOpacity>
               </View>
-              <TextInput
-                placeholder="Search banks..."
-                placeholderTextColor="#8B949E"
-                value={bankSearch}
-                onChangeText={setBankSearch}
-                className="bg-surface-container-high rounded-xl py-4 pl-12 pr-4 text-white font-inter-medium"
-              />
+
+              <View className="relative">
+                <View className="absolute left-4 top-4 z-10">
+                  <Search size={20} color="#8B949E" />
+                </View>
+                <TextInput
+                  placeholder="Search for your bank..."
+                  placeholderTextColor="#484f58"
+                  value={bankSearch}
+                  onChangeText={setBankSearch}
+                  className="bg-[#161B22] rounded-2xl py-4 pl-12 pr-4 text-white font-inter-medium border border-[#30363D]"
+                />
+              </View>
             </View>
 
             <FlatList
               data={filteredBanks}
               keyExtractor={item => item.code}
+              contentContainerStyle={{ padding: 24 }}
               renderItem={({ item }) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => {
                     setSelectedBank(item);
                     setIsBankPickerVisible(false);
                     setBankSearch("");
+                    if (errors.bank) setErrors(prev => ({ ...prev, bank: undefined }));
                   }}
-                  className="py-4 border-b border-outline/10 flex-row items-center justify-between"
+                  activeOpacity={0.7}
+                  className="py-5 border-b border-[#30363D]/30 flex-row items-center justify-between"
                 >
-                  <Typography className="text-white text-lg">{item.name}</Typography>
+                  <View className="flex-row items-center">
+                    <View className="w-10 h-10 bg-[#161B22] rounded-xl items-center justify-center mr-4 border border-[#30363D]">
+                      <Landmark size={20} color={selectedBank?.code === item.code ? "#F5E642" : "#8B949E"} />
+                    </View>
+                    <Typography className={`text-lg ${selectedBank?.code === item.code ? "text-[#F5E642] font-inter-bold" : "text-white font-inter-medium"}`}>
+                      {item.name}
+                    </Typography>
+                  </View>
                   {selectedBank?.code === item.code && (
-                    <CheckCircle2 size={20} color="#F5E642" />
+                    <View className="w-6 h-6 bg-[#F5E642] rounded-full items-center justify-center">
+                      <CheckCircle2 size={16} color="#0D1117" />
+                    </View>
                   )}
                 </TouchableOpacity>
               )}
+              ListEmptyComponent={
+                <View className="py-20 items-center">
+                  <Typography className="text-[#8B949E]">No banks found for "{bankSearch}"</Typography>
+                </View>
+              }
             />
           </View>
         </Modal>
@@ -562,17 +698,17 @@ export default function WithdrawFundsScreen() {
         animationType="fade"
       >
         <View className="flex-1 bg-black/90 items-center justify-center p-6">
-          <Card className="w-full bg-[#161B22] p-8 items-center border border-primary-fixed/20">
-            <View className="w-20 h-20 rounded-full bg-secondary-container items-center justify-center mb-6">
+          <Card className="w-full bg-[#161B22] p-8 items-center border border-[#F5E642]/20">
+            <View className="w-20 h-20 rounded-full bg-[#00C896]/10 items-center justify-center mb-6">
               <CheckCircle2 size={48} color="#00C896" />
             </View>
             <Typography variant="heading" className="text-white mb-2">Withdrawal Initiated</Typography>
-            <Typography className="text-outline text-center mb-8">
+            <Typography className="text-[#8B949E] text-center mb-8">
               Funds will be sent to {selectedBankAccount?.bank_name} shortly.
             </Typography>
-            
-            <View className="bg-[#0D1117] p-4 rounded-xl w-full mb-8 items-center border border-outline/10">
-              <Typography variant="caption" className="text-outline uppercase mb-1">Reference</Typography>
+
+            <View className="bg-[#0D1117] p-4 rounded-xl w-full mb-8 items-center border border-[#30363D]">
+              <Typography variant="caption" className="text-[#8B949E] uppercase mb-1">Reference</Typography>
               <Typography className="text-white font-inter-bold">{withdrawReference}</Typography>
             </View>
 

@@ -17,27 +17,11 @@ export const StepProgressBar: React.FC<StepProgressBarProps> = ({
     <View className="mb-8">
       {/* Top Labels Row */}
       <View className="flex-row justify-between items-center mb-4">
-        <Typography
-          style={{
-            color: "#484F58",
-            fontSize: 11,
-            fontWeight: "700",
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-          }}
-        >
+        <Typography variant="label" className="!text-xs">
           STEP 0{currentStep} OF 0{totalSteps}
         </Typography>
         {label && (
-          <Typography
-            style={{
-              color: "#F5E642",
-              fontSize: 11,
-              fontWeight: "700",
-              letterSpacing: 1.5,
-              textTransform: "uppercase",
-            }}
-          >
+          <Typography variant="label" className="!text-primary-fixed text-xs">
             {label}
           </Typography>
         )}

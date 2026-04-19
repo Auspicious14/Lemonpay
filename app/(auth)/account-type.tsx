@@ -48,7 +48,9 @@ export default function AccountTypeScreen() {
         {/* Top Wordmark */}
         <View className="flex-row items-center mb-6">
           <Ionicons name="shield-checkmark" size={20} color="#F5E642" />
-          <Typography style={styles.brandText}>LEMONPAY</Typography>
+          <Typography variant="subheading" className="!text-primary-fixed">
+            LEMONPAY
+          </Typography>
         </View>
 
         {/* Progress */}
@@ -56,10 +58,12 @@ export default function AccountTypeScreen() {
 
         {/* Heading */}
         <View className="flex-row items-center mb-2">
-          <Typography style={styles.headingWhite}>Define Your </Typography>
-          <Typography style={styles.headingYellow}>Role</Typography>
+          <Typography variant="heading">Define Your </Typography>
+          <Typography variant="heading" className="!text-primary-fixed">
+            Role
+          </Typography>
         </View>
-        <Typography style={styles.subtext}>
+        <Typography variant="body" className="mb-4">
           Whether you're securing a purchase or protecting your trade, choose
           the path that fits you.
         </Typography>
@@ -93,8 +97,10 @@ export default function AccountTypeScreen() {
               />
             </View>
             <View style={{ marginLeft: 16 }}>
-              <Typography style={styles.roleTitle}>I am a Buyer</Typography>
-              <Typography style={styles.roleSub}>
+              <Typography variant="body" className="!text-primary-fixed mb-2">
+                I am a Buyer
+              </Typography>
+              <Typography variant="caption">
                 I want to purchase goods securely.
               </Typography>
             </View>
@@ -155,8 +161,10 @@ export default function AccountTypeScreen() {
               />
             </View>
             <View style={{ marginLeft: 16 }}>
-              <Typography style={styles.roleTitle}>I am a Seller</Typography>
-              <Typography style={styles.roleSub}>
+              <Typography variant="body" className="!text-primary-fixed mb-2">
+                I am a Seller
+              </Typography>
+              <Typography variant="caption">
                 I want to sell my products with trust.
               </Typography>
             </View>
@@ -208,8 +216,8 @@ export default function AccountTypeScreen() {
             end={{ x: 1, y: 0 }}
             style={[styles.button, isPending && { opacity: 0.6 }]}
           >
-            <View className="flex-row items-center">
-              <Typography style={styles.buttonText}>
+            <View className="flex-row gap-2 items-center">
+              <Typography variant="body" className="!text-black">
                 {isPending ? "REQUESTING OTP..." : "PROCEED TO ONBOARDING"}
               </Typography>
               <Ionicons name="arrow-forward" size={18} color="#0D1117" />
@@ -250,10 +258,14 @@ export default function AccountTypeScreen() {
           onPress={() => router.back()}
           className="flex-row items-center"
         >
-          <Typography style={styles.bottomLinkText}>← BACK</Typography>
+          <Typography variant="caption" className="!text-sm">
+            ← BACK
+          </Typography>
         </TouchableOpacity>
         <TouchableOpacity className="flex-row items-center">
-          <Typography style={styles.bottomLinkText}>? HELP</Typography>
+          <Typography variant="caption" className="!text-sm">
+            ? HELP
+          </Typography>
         </TouchableOpacity>
       </View>
     </Screen>
@@ -331,16 +343,11 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 56,
-    borderRadius: 28,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  buttonText: {
-    color: "#0D1117",
-    fontSize: 15,
-    fontWeight: "800",
-    marginRight: 8,
-  },
+
   footerDisclaimer: {
     color: "#484F58",
     fontSize: 10,

@@ -93,6 +93,8 @@ export default function HomeScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
 
+  const isSeller = user?.account_type === "seller";
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([refetchBalance(), refetchEscrows(), refetchTransactions()]);
@@ -106,7 +108,7 @@ export default function HomeScreen() {
   const activeEscrows = (escrowsData?.data || []).filter(e => 
     ['pending_seller_agreement', 'pending_buyer_confirmation', 
      'locked', 'funded', 'awaiting_buyer_release'].includes(e.status)
-  ).slice(0, 2);
+  );
   
   const recentTransactions = (transactionsData?.data || []).slice(0, 5);
 
@@ -292,7 +294,7 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             className="-mx-6 px-6"
-            snapToInterval={width - 48 + 12}
+            snapToInterval={width - 48}
             decelerationRate="fast"
           >
             {isEscrowsLoading ? (
@@ -301,7 +303,7 @@ export default function HomeScreen() {
                   <View 
                     key={i} 
                     className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 mr-3"
-                    style={{ width: width - 80, height: 180 }}
+                    style={{ width: width - 48, height: 180 }}
                   />
                 ))}
               </View>
@@ -312,8 +314,8 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={escrow.id}
                     className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 mr-3"
-                    style={{ width: width - 80 }}
-                    onPress={() => router.push(`/escrow/${escrow.id}`)}
+                    style={{ width: width - 48 }}
+                    onPress={() => router.push(`/escrow/${escrow.uuid}`)}
                   >
                     <View className="flex-row justify-between items-start mb-4">
                       <View className="w-10 h-10 bg-[#0D1117] rounded-lg items-center justify-center">
@@ -449,13 +451,15 @@ export default function HomeScreen() {
       </View>
 
       {/* FLOATING ACTION BUTTON */}
-      <TouchableOpacity
-        className="absolute bottom-20 right-6 w-14 h-14 rounded-full bg-accent-primary items-center justify-center shadow-lg"
-        style={{ elevation: 5 }}
-        onPress={() => router.push("/escrow/create")}
-      >
-        <Plus size={32} color="#0D1117" />
-      </TouchableOpacity>
+      {!isSeller && (
+        <TouchableOpacity
+          className="absolute bottom-20 right-6 w-14 h-14 rounded-full bg-accent-primary items-center justify-center shadow-lg"
+          style={{ elevation: 5 }}
+          onPress={() => router.push("/escrow/create")}
+        >
+          <Plus size={32} color="#0D1117" />
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
