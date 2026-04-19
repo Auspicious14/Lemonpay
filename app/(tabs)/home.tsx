@@ -103,7 +103,11 @@ export default function HomeScreen() {
   useRefreshOnFocus(refetchEscrows);
   useRefreshOnFocus(refetchTransactions);
 
-  const activeEscrows = escrowsData?.data.filter((e) => e.is_active) || [];
+  const activeEscrows = (escrowsData?.data || []).filter(e => 
+    ['pending_seller_agreement', 'pending_buyer_confirmation', 
+     'locked', 'funded', 'awaiting_buyer_release'].includes(e.status)
+  ).slice(0, 2);
+  
   const recentTransactions = (transactionsData?.data || []).slice(0, 5);
 
   const getStatusInfo = (status: any) => {
@@ -130,11 +134,19 @@ export default function HomeScreen() {
       <View className="px-6 py-4 flex-row justify-between items-center bg-[#0D1117]">
         <View className="flex-row items-center">
           <View className="w-8 h-8 rounded-full bg-accent-primary items-center justify-center mr-2">
-            <Text className="text-[#0D1117] font-inter-bold text-lg">
+            <Text 
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-[#0D1117] text-lg"
+            >
               {user?.first_name?.charAt(0) || "L"}
             </Text>
           </View>
-          <Text className="text-white font-inter-bold text-xl">LemonPay</Text>
+          <Text 
+            style={{ fontFamily: 'Inter-Bold' }}
+            className="text-white text-xl"
+          >
+            LemonPay
+          </Text>
         </View>
         <View className="flex-row items-center gap-x-4">
           <TouchableOpacity 
@@ -166,7 +178,10 @@ export default function HomeScreen() {
         <View className="bg-[#161B22] rounded-xl p-5 mt-4">
           <View className="flex-row items-center mb-2">
             <Wallet size={12} color="#8B949E" />
-            <Text className="text-[#8B949E] font-inter-bold text-[10px] ml-2 tracking-widest uppercase">
+            <Text 
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-[#8B949E] text-[10px] ml-2 tracking-widest uppercase"
+            >
               TOTAL WALLET BALANCE
             </Text>
           </View>
@@ -174,14 +189,20 @@ export default function HomeScreen() {
           {isBalanceLoading ? (
             <BalanceSkeleton />
           ) : (
-            <Text className="text-white font-inter-extrabold text-4xl mb-1">
+            <Text 
+              style={{ fontFamily: 'Inter-ExtraBold' }}
+              className="text-white text-4xl mb-1"
+            >
               {formatCurrency(balance?.balance || 0)}
             </Text>
           )}
 
           <View className="flex-row items-center mb-6">
             <TrendingUp size={14} color="#00C896" />
-            <Text className="text-[#00C896] font-inter-medium text-xs ml-1">
+            <Text 
+              style={{ fontFamily: 'Inter-Medium' }}
+              className="text-[#00C896] text-xs ml-1"
+            >
               +2.4% this month
             </Text>
           </View>
@@ -196,7 +217,10 @@ export default function HomeScreen() {
                 className="flex-1 flex-row items-center justify-center"
               >
                 <Plus size={18} color="#0D1117" />
-                <Text className="text-[#0D1117] font-inter-bold text-sm ml-2">
+                <Text 
+                  style={{ fontFamily: 'Inter-Bold' }}
+                  className="text-[#0D1117] text-sm ml-2"
+                >
                   Fund Wallet
                 </Text>
               </LinearGradient>
@@ -207,7 +231,10 @@ export default function HomeScreen() {
               onPress={() => router.push("/wallet/withdraw")}
             >
               <Upload size={18} color="white" />
-              <Text className="text-white font-inter-bold text-sm ml-2">
+              <Text 
+                style={{ fontFamily: 'Inter-Bold' }}
+                className="text-white text-sm ml-2"
+              >
                 Withdraw
               </Text>
             </TouchableOpacity>
@@ -219,20 +246,34 @@ export default function HomeScreen() {
           <View className="flex-1">
             <View className="flex-row items-center mb-1">
               <ShieldCheck size={20} color="#00C896" />
-              <Text className="text-[#8B949E] font-inter-medium text-xs ml-2">
+              <Text 
+                style={{ fontFamily: 'Inter-Medium' }}
+                className="text-[#8B949E] text-xs ml-2"
+              >
                 Escrow Success Rate
               </Text>
             </View>
-            <Text className="text-white font-inter-bold text-2xl">99.8%</Text>
+            <Text 
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-white text-2xl"
+            >
+              99.8%
+            </Text>
             <View className="flex-row items-center mt-2">
               <Lock size={12} color="#8B949E" />
-              <Text className="text-[#8B949E] font-inter text-[10px] ml-1 uppercase">
+              <Text 
+                style={{ fontFamily: 'Inter' }}
+                className="text-[#8B949E] text-[10px] ml-1 uppercase"
+              >
                 Secure by LemonPay Guard
               </Text>
             </View>
           </View>
           <View className="bg-[#00C896]/20 px-3 py-1 rounded-full">
-            <Text className="text-[#00C896] font-inter-bold text-[10px] tracking-widest uppercase">
+            <Text 
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-[#00C896] text-[10px] tracking-widest uppercase"
+            >
               GOLD TIER
             </Text>
           </View>
@@ -265,7 +306,7 @@ export default function HomeScreen() {
                 ))}
               </View>
             ) : activeEscrows.length > 0 ? (
-              activeEscrows.slice(0, 2).map((escrow) => {
+              activeEscrows.map((escrow) => {
                 const statusInfo = getStatusInfo(escrow.status);
                 return (
                   <TouchableOpacity
@@ -279,45 +320,61 @@ export default function HomeScreen() {
                         <ShoppingBag size={20} color="white" />
                       </View>
                       <View className={`${statusInfo.color} px-2 py-1 rounded`}>
-                        <Text className="text-[#0D1117] font-inter-bold text-[8px] tracking-widest uppercase">
+                        <Text 
+                          style={{ fontFamily: 'Inter-Bold' }}
+                          className="text-[#0D1117] text-[8px] tracking-widest uppercase"
+                        >
                           {statusInfo.label}
                         </Text>
                       </View>
                     </View>
 
                     <Text
-                      className="text-white font-inter-bold text-lg"
+                      style={{ fontFamily: 'Inter-Bold' }}
+                      className="text-white text-lg"
                       numberOfLines={1}
                     >
                       {escrow.title}
                     </Text>
-                    <Text className="text-[#8B949E] font-inter text-sm mb-4">
+                    <Text 
+                      style={{ fontFamily: 'Inter' }}
+                      className="text-[#8B949E] text-sm mb-4"
+                    >
                       @{escrow.seller?.first_name || escrow.seller_identifier || "Merchant"}
                     </Text>
 
                     <EscrowProgressBar status={escrow.status} />
 
                     <View className="flex-row justify-between items-center mt-6">
-                      <Text className="text-white font-inter-bold text-xl">
+                      <Text 
+                        style={{ fontFamily: 'Inter-Bold' }}
+                        className="text-white text-xl"
+                      >
                         {formatCurrency(escrow.amount)}
                       </Text>
-                      <Text className="text-[#8B949E] font-inter text-xs">
-                        {formatDate(escrow.created_at)}
-                      </Text>
+                      <ArrowRight size={16} color="#8B949E" />
                     </View>
                   </TouchableOpacity>
                 );
               })
             ) : (
-              <View
-                className="bg-[#161B22] rounded-xl border border-[#30363D] p-10 items-center justify-center mr-3"
-                style={{ width: width - 80 }}
+              <TouchableOpacity
+                onPress={() => router.push("/escrow/create")}
+                className="bg-[#161B22] rounded-xl border border-[#30363D] border-dashed p-8 items-center justify-center mr-3"
+                style={{ width: width - 80, height: 180 }}
               >
-                <ShoppingBag size={32} color="#30363D" />
-                <Text className="text-[#8B949E] font-inter-medium text-center mt-2">
-                  No active escrows
+                <Plus size={32} color="#30363D" />
+                <Text 
+                  style={{ fontFamily: 'Inter-Bold', color: 'white', marginTop: 12 }}
+                >
+                  Create New Escrow
                 </Text>
-              </View>
+                <Text 
+                  style={{ fontFamily: 'Inter', color: '#8B949E', fontSize: 12, marginTop: 4 }}
+                >
+                  No active escrows found
+                </Text>
+              </TouchableOpacity>
             )}
           </ScrollView>
         </View>
@@ -328,7 +385,12 @@ export default function HomeScreen() {
           <View className="bg-[#161B22] rounded-xl px-5">
             {isTransactionsLoading ? (
               <View className="py-10 items-center">
-                <Text className="text-[#8B949E] font-inter">Loading...</Text>
+                <Text 
+                  style={{ fontFamily: 'Inter' }}
+                  className="text-[#8B949E]"
+                >
+                  Loading...
+                </Text>
               </View>
             ) : recentTransactions.length > 0 ? (
               recentTransactions.map((tx, index) => {
@@ -358,7 +420,10 @@ export default function HomeScreen() {
               })
             ) : (
               <View className="py-10 items-center">
-                <Text className="text-[#8B949E] font-inter">
+                <Text 
+                  style={{ fontFamily: 'Inter' }}
+                  className="text-[#8B949E]"
+                >
                   No transactions yet
                 </Text>
               </View>
@@ -374,7 +439,10 @@ export default function HomeScreen() {
       >
         <View className="flex-row items-center border-t border-[#30363D] w-full justify-center pt-3">
           <ShieldCheck size={12} color="#8B949E" />
-          <Text className="text-[#8B949E] font-inter-bold text-[8px] ml-1 tracking-widest uppercase">
+          <Text 
+            style={{ fontFamily: 'Inter-Bold' }}
+            className="text-[#8B949E] text-[8px] ml-1 tracking-widest uppercase"
+          >
             SECURE BY LEMONPAY GUARD V2.4
           </Text>
         </View>

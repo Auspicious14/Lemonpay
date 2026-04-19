@@ -42,7 +42,7 @@ export default function EscrowDetailScreen() {
   const showToast = useToastStore((state) => state.show);
   const escrowId = parseInt(id || "0", 10);
 
-  const { data: escrow, isLoading } = useEscrowDetail(escrowId);
+  const { data: escrow, isLoading, isError, error, refetch } = useEscrowDetail(escrowId);
   const { data: balanceData } = useWalletBalance();
 
   const [isSellerTermsModalVisible, setIsSellerTermsModalVisible] = useState(false);
@@ -53,6 +53,43 @@ export default function EscrowDetailScreen() {
   const fundEscrowMutation = useFundEscrow(escrowId);
   const markDeliveredMutation = useMarkDelivered(escrowId);
   const confirmDeliveryMutation = useConfirmDelivery(escrowId);
+
+  // Add validation
+  if (!id || isNaN(escrowId) || escrowId === 0) {
+    return (
+      <Screen showBackButton title="Escrow Detail">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ fontFamily: 'Inter-Bold', color: 'white', fontSize: 18, marginBottom: 8 }}>
+            Escrow not found
+          </Text>
+          <Text style={{ fontFamily: 'Inter', color: '#8B949E', fontSize: 14, textAlign: 'center' }}>
+            Invalid escrow ID: {id}
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (isError) {
+    console.error('[ESCROW DETAIL] Error:', error);
+    return (
+      <Screen showBackButton title="Escrow Detail">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ fontFamily: 'Inter-Bold', color: '#FF4D4F', fontSize: 16, textAlign: 'center' }}>
+            {(error as any)?.response?.data?.message || 'Failed to load escrow'}
+          </Text>
+          <TouchableOpacity 
+            onPress={() => refetch()} 
+            style={{ marginTop: 16 }}
+          >
+            <Text style={{ fontFamily: 'Inter-Bold', color: '#F5E642' }}>
+              Try again
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Screen>
+    );
+  }
 
   if (isLoading || !escrow) {
     return (

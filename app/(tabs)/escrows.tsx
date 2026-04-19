@@ -10,6 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Plus, ShoppingBag } from "lucide-react-native";
 import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/context/AuthContext";
 import { useMyEscrows } from "@/lib/hooks/useEscrow";
 import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
@@ -130,7 +131,12 @@ export default function EscrowsScreen() {
       
       {/* HEADER */}
       <View className="px-6 pt-4 pb-4">
-        <Text className="text-white font-inter-bold text-3xl">My Escrows</Text>
+        <Text 
+          style={{ fontFamily: 'Inter-Bold' }}
+          className="text-white text-3xl"
+        >
+          My Escrows
+        </Text>
       </View>
 
       {/* FILTER TABS */}
@@ -145,7 +151,8 @@ export default function EscrowsScreen() {
               }`}
             >
               <Text
-                className={`font-inter-bold text-[10px] tracking-widest ${
+                style={{ fontFamily: 'Inter-Bold' }}
+                className={`text-[10px] tracking-widest ${
                   activeFilter === tab ? "text-[#0D1117]" : "text-[#8B949E]"
                 }`}
               >
@@ -159,7 +166,82 @@ export default function EscrowsScreen() {
       <FlatList
         data={filteredEscrows}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={renderEscrowItem}
+        renderItem={({ item }) => {
+          const badgeInfo = getStatusBadgeInfo(item.status);
+          const isBuyer = user?.id === item.buyer_id;
+          
+          let colorClass = "text-gray-400";
+          let bgClass = "bg-[#30363D]";
+          
+          switch (badgeInfo.color) {
+            case "amber": colorClass = "text-amber-500"; bgClass = "bg-amber-500/10"; break;
+            case "blue": colorClass = "text-blue-500"; bgClass = "bg-blue-500/10"; break;
+            case "purple": colorClass = "text-purple-500"; bgClass = "bg-purple-500/10"; break;
+            case "yellow": colorClass = "text-yellow-500"; bgClass = "bg-yellow-500/10"; break;
+            case "teal": colorClass = "text-[#00C896]"; bgClass = "bg-[#00C896]/10"; break;
+            case "red": colorClass = "text-red-500"; bgClass = "bg-red-500/10"; break;
+          }
+
+          return (
+            <TouchableOpacity
+              onPress={() => router.push(`/escrow/${item.id}`)}
+              className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 mb-4"
+            >
+              <View className="flex-row justify-between items-start mb-3">
+                <View className={`${bgClass} px-2 py-1 rounded`}>
+                  <Text 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className={`${colorClass} text-[8px] tracking-widest uppercase`}
+                  >
+                    {badgeInfo.label}
+                  </Text>
+                </View>
+                <View className="bg-[#0D1117] px-2 py-1 rounded-full border border-[#30363D]">
+                  <Text 
+                    style={{ fontFamily: 'Inter-Bold' }}
+                    className="text-[#8B949E] text-[8px] tracking-widest uppercase"
+                  >
+                    {isBuyer ? "BUYER" : "SELLER"}
+                  </Text>
+                </View>
+              </View>
+
+              <Text 
+                style={{ fontFamily: 'Inter-Bold' }}
+                className="text-white text-lg mb-1" 
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+              
+              <Text 
+                style={{ fontFamily: 'Inter' }}
+                className="text-[#8B949E] text-sm mb-4"
+              >
+                With {isBuyer 
+                  ? (item.seller?.first_name ? `${item.seller.first_name} ${item.seller.last_name}` : item.seller_identifier)
+                  : `${item.buyer.first_name} ${item.buyer.last_name}`}
+              </Text>
+
+              <EscrowProgressBar status={item.status} />
+
+              <View className="flex-row justify-between items-center mt-6">
+                <Text 
+                  style={{ fontFamily: 'Inter-Bold' }}
+                  className="text-white text-xl"
+                >
+                  {formatCurrency(item.amount)}
+                </Text>
+                <Text 
+                  style={{ fontFamily: 'Inter' }}
+                  className="text-[#8B949E] text-xs"
+                >
+                  {formatDate(item.created_at)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
         contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -171,29 +253,67 @@ export default function EscrowsScreen() {
         }
         ListEmptyComponent={
           isLoading ? (
-            <View className="py-20 items-center">
+            <View style={{ paddingVertical: 80, alignItems: 'center' }}>
               <LoadingSpinner />
             </View>
           ) : (
-            <EmptyState
-              title={
-                activeFilter === "ALL"
-                  ? "No escrows yet"
-                  : activeFilter === "ACTIVE"
-                  ? "No active escrows"
-                  : activeFilter === "COMPLETED"
-                  ? "No completed escrows"
-                  : "No disputes"
-              }
-              subtitle={
-                activeFilter === "ALL"
-                  ? "Create your first escrow to start a secure transaction."
-                  : "Try changing your filter to see other escrows."
-              }
-              icon={<ShoppingBag size={48} color="#8B949E" />}
-              ctaLabel={activeFilter === "ALL" ? "Create Escrow" : undefined}
-              onCtaPress={() => router.push("/escrow/create")}
-            />
+            <View style={{ 
+              paddingVertical: 80, 
+              alignItems: 'center', 
+              paddingHorizontal: 24, 
+            }}> 
+              <View style={{ 
+                width: 80, height: 80, borderRadius: 40, 
+                backgroundColor: '#161B22', 
+                alignItems: 'center', justifyContent: 'center', 
+                marginBottom: 20, 
+              }}> 
+                <ShoppingBag size={40} color="#8B949E" /> 
+              </View> 
+              <Text style={{ 
+                fontFamily: 'Inter-Bold', color: 'white', 
+                fontSize: 20, marginBottom: 8, textAlign: 'center' 
+              }}> 
+                {activeFilter === 'ALL' ? 'No escrows yet' 
+                 : activeFilter === 'ACTIVE' ? 'No active escrows' 
+                 : activeFilter === 'COMPLETED' ? 'No completed escrows' 
+                 : 'No disputes'} 
+              </Text> 
+              <Text style={{ 
+                fontFamily: 'Inter', color: '#8B949E', 
+                fontSize: 14, textAlign: 'center', lineHeight: 20, 
+                marginBottom: 32, 
+              }}> 
+                {activeFilter === 'ALL' 
+                  ? 'Create your first escrow to start a secure transaction.' 
+                  : 'Try changing your filter to see other escrows.'} 
+              </Text> 
+              {activeFilter === 'ALL' && ( 
+                <TouchableOpacity 
+                  onPress={() => router.push('/escrow/create')} 
+                  style={{ overflow: 'hidden', borderRadius: 12 }} 
+                > 
+                  <LinearGradient 
+                    colors={['#F5E642', '#D4C200']} 
+                    style={{ 
+                      paddingHorizontal: 24, paddingVertical: 14, 
+                      borderRadius: 12, 
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      gap: 8, 
+                    }} 
+                  > 
+                    <Plus size={18} color="#0D1117" /> 
+                    <Text style={{ 
+                      fontFamily: 'Inter-Bold', color: '#0D1117', 
+                      fontSize: 15 
+                    }}> 
+                      Create Escrow 
+                    </Text> 
+                  </LinearGradient> 
+                </TouchableOpacity> 
+              )} 
+            </View>
           )
         }
       />

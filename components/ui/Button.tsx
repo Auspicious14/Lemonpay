@@ -33,7 +33,7 @@ const variantStyles: Record<ButtonVariant, string> = {
 };
 
 const textStyles: Record<ButtonVariant, string> = {
-  primary: "text-[#1f1c00] font-inter-bold",
+  primary: "text-[#F5E642] font-inter-bold",
   secondary: "text-white font-inter-semibold",
   ghost: "text-white font-inter-semibold",
   danger: "text-white font-inter-bold",

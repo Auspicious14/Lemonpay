@@ -22,7 +22,9 @@ export const useEscrowDetail = (id: number) => {
   return useQuery<Escrow>({
     queryKey: ["escrow", id],
     queryFn: async () => {
+      console.log('[ESCROW DETAIL] fetching id:', id);
       const response = await apiClient.get<ApiResponse<Escrow>>(ENDPOINTS.ESCROW.DETAIL(id));
+      console.log('[ESCROW DETAIL] response:', JSON.stringify(response.data));
       return response.data.data;
     },
     staleTime: 15000,
@@ -42,10 +44,12 @@ export const useCreateEscrow = () => {
 
   return useMutation({
     mutationFn: async (params: CreateEscrowParams) => {
+      console.log('[CREATE ESCROW] initiating with:', params);
       const response = await apiClient.post<ApiResponse<{ escrow: Escrow; share_link: string }>>(
         ENDPOINTS.ESCROW.CREATE,
         params
       );
+      console.log('[CREATE ESCROW] response:', JSON.stringify(response.data));
       return response.data.data;
     },
     onSuccess: () => {

@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Text,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
@@ -28,8 +29,9 @@ export default function FundWalletScreen() {
   const { show: showToast } = useToastStore();
   const { mutateAsync: fundWallet, isPending } = useFundWallet();
 
-  const [amount, setAmount] = useState("");
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("bank");
+  const [isAmountSheetVisible, setIsAmountSheetVisible] = useState(false);
+  const [amount, setAmount] = useState("");
 
   const validateAmount = (amt: number): string | null => {
     if (!amt || amt <= 0) return "Please enter an amount";
@@ -39,7 +41,17 @@ export default function FundWalletScreen() {
   };
 
   const handleContinue = async () => {
-    const amountVal = parseFloat(amount.replace(/,/g, ""));
+    if (selectedMethod === "bank") {
+      router.push("/wallet/bank-transfer");
+      return;
+    }
+
+    // For card/ussd, show amount sheet
+    setIsAmountSheetVisible(true);
+  };
+
+  const handleInitializePayment = async () => {
+    const amountVal = parseFloat(amount.replace(/[^0-9]/g, ""));
     const error = validateAmount(amountVal);
     if (error) {
       showToast(error, "error");
@@ -52,31 +64,21 @@ export default function FundWalletScreen() {
         email: user?.email || "",
       });
 
-      if (selectedMethod === "bank") {
-        router.push({
-          pathname: "/wallet/bank-transfer",
-          params: {
-            amount: amountVal,
-            reference: response.reference,
-          },
-        });
-      } else {
-        // Card or USSD
-        const result = await WebBrowser.openAuthSessionAsync(
-          response.authorization_url,
-          "lemonpay://",
-        );
+      setIsAmountSheetVisible(false);
 
-        if (result.type === "success" || result.type === "dismiss") {
-          // Give webhook time to process
-          setTimeout(() => {
-            router.replace("/(tabs)/wallet");
-            showToast(
-              "Transaction initiated. Your balance will update shortly.",
-              "success",
-            );
-          }, 2000);
-        }
+      const result = await WebBrowser.openAuthSessionAsync(
+        response.authorization_url,
+        "lemonpay://",
+      );
+
+      if (result.type === "success" || result.type === "dismiss") {
+        setTimeout(() => {
+          router.replace("/(tabs)/wallet");
+          showToast(
+            "Transaction initiated. Your balance will update shortly.",
+            "success",
+          );
+        }, 2000);
       }
     } catch (err: any) {
       showToast(
@@ -87,32 +89,27 @@ export default function FundWalletScreen() {
   };
 
   const formatAmount = (text: string) => {
-    // Basic formatting for display if needed, but here we keep it raw for input
-    setAmount(text.replace(/[^0-9]/g, ""));
+    const digits = text.replace(/[^0-9]/g, "");
+    setAmount(digits);
   };
 
   return (
     <Screen withPadding={false}>
       <View className="flex-row items-center justify-between px-6 py-4 bg-[#0D1117]">
-        <TouchableOpacity onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back-ios" size={24} color="#F5E642" />
-        </TouchableOpacity>
-        <Typography variant="heading" className="text-[#F5E642]" weight="700">
-          Fund Wallet
-        </Typography>
-        <Typography
-          variant="body"
-          className="text-white font-bold"
-          weight="800"
-        >
+        <View className="flex gap-4 items-center flex-row">
+          <TouchableOpacity onPress={() => router.back()}>
+            <MaterialIcons name="arrow-back-ios" size={24} color="#F5E642" />
+          </TouchableOpacity>
+          <Typography variant="body" className="!text-[#F5E642]" weight="700">
+            Fund Wallet
+          </Typography>
+        </View>
+        <Typography variant="body" className="!text-[#F5E642]" weight="800">
           LEMONPAY
         </Typography>
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1"
-      >
+      <View className="flex-1 bg-[#0D1117]">
         <ScrollView
           showsVerticalScrollIndicator={false}
           className="flex-1 px-6"
@@ -120,100 +117,66 @@ export default function FundWalletScreen() {
         >
           <View className="mt-4">
             <Typography
+              // style={{ fontFamily: "Inter-Bold", letterSpacing: 2 }}
               variant="label-sm"
-              className="text-[#F5E642] tracking-[2px]"
-              weight="700"
+              className="!text-[#F5E642] uppercase"
+              // weight="700"
             >
               CHOOSE METHOD
             </Typography>
 
             <View className="mt-4 mb-8">
               <Typography
+                style={{
+                  fontFamily: "Inter-Bold",
+                  fontSize: 36,
+                  lineHeight: 44,
+                }}
                 variant="display"
-                className="text-white text-[38px] leading-[44px]"
+                className="text-white"
                 weight="700"
               >
                 Securely top up
               </Typography>
               <Typography
+                style={{
+                  fontFamily: "Inter-Bold",
+                  fontSize: 36,
+                  lineHeight: 44,
+                }}
                 variant="display"
-                className="text-white text-[38px] leading-[44px]"
+                className="text-white"
                 weight="700"
               >
                 your{" "}
                 <Typography
+                  style={{
+                    fontFamily: "Inter-Bold",
+                    fontSize: 36,
+                    color: "#F5E642",
+                  }}
                   variant="display"
-                  className="text-[#F5E642] text-[38px]"
                   weight="700"
                 >
                   escrow wallet
                 </Typography>
               </Typography>
               <Typography
+                style={{
+                  fontFamily: "Inter-Bold",
+                  fontSize: 36,
+                  lineHeight: 44,
+                }}
                 variant="display"
-                className="text-white text-[38px] leading-[44px]"
+                className="text-white"
                 weight="700"
               >
                 instantly.
               </Typography>
             </View>
 
-            {/* AMOUNT INPUT SECTION */}
-            <View className="bg-[#161B22] rounded-[24px] border border-[#30363D] p-5 mb-6">
-              <Typography
-                variant="label-sm"
-                className="text-[#8B949E] tracking-widest uppercase mb-4"
-                weight="600"
-              >
-                ENTER AMOUNT
-              </Typography>
-              <View className="flex-row items-center">
-                <Typography className="text-[#F5E642] text-3xl font-bold mr-2">
-                  ₦
-                </Typography>
-                <TextInput
-                  value={amount}
-                  onChangeText={formatAmount}
-                  placeholder="0.00"
-                  placeholderTextColor="#30363D"
-                  keyboardType="numeric"
-                  className="flex-1 text-white text-3xl font-bold"
-                  autoFocus
-                />
-              </View>
-
-              {/* Quick Amounts */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="mt-6 -mx-1"
-              >
-                {QUICK_AMOUNTS.map((amt) => (
-                  <TouchableOpacity
-                    key={amt}
-                    onPress={() => setAmount(amt.toString())}
-                    className={`px-4 py-2 rounded-full border mr-2 ${
-                      amount === amt.toString()
-                        ? "bg-[#F5E642] border-[#F5E642]"
-                        : "bg-[#21262D] border-[#30363D]"
-                    }`}
-                  >
-                    <Text
-                      style={{
-                        color: amount === amt.toString() ? "#0D1117" : "white",
-                        fontSize: 12,
-                        fontWeight: "600",
-                      }}
-                    >
-                      ₦{amt.toLocaleString()}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
             {/* METHOD SELECTION CARDS */}
-            <View className="space-y-4">
+            <View style={{ gap: 16 }}>
               {/* Bank Transfer */}
               <TouchableOpacity
                 onPress={() => setSelectedMethod("bank")}
@@ -231,15 +194,24 @@ export default function FundWalletScreen() {
                   />
                 </View>
                 <View className="flex-1">
-                  <Typography className="text-white font-bold text-lg">
+                  <Typography
+                    style={{ fontFamily: "Inter-Bold" }}
+                    className="text-white text-lg"
+                  >
                     Bank Transfer
                   </Typography>
-                  <Typography className="text-[#8B949E] text-xs">
+                  <Typography
+                    style={{ fontFamily: "Inter" }}
+                    className="text-[#8B949E] text-xs"
+                  >
                     Recommended, 0% fees
                   </Typography>
                 </View>
                 <View className="bg-[#003829] px-3 py-1 rounded-full">
-                  <Typography className="text-[#00C896] text-[10px] font-bold uppercase">
+                  <Typography
+                    style={{ fontFamily: "Inter-Bold" }}
+                    className="text-[#00C896] text-[10px] uppercase"
+                  >
                     FASTEST
                   </Typography>
                 </View>
@@ -262,10 +234,16 @@ export default function FundWalletScreen() {
                   />
                 </View>
                 <View className="flex-1">
-                  <Typography className="text-white font-bold text-lg">
+                  <Typography
+                    style={{ fontFamily: "Inter-Bold" }}
+                    className="text-white text-lg"
+                  >
                     Credit/Debit Card
                   </Typography>
-                  <Typography className="text-[#8B949E] text-xs">
+                  <Typography
+                    style={{ fontFamily: "Inter" }}
+                    className="text-[#8B949E] text-xs"
+                  >
                     Instant, 1.5% fee
                   </Typography>
                 </View>
@@ -288,83 +266,148 @@ export default function FundWalletScreen() {
                   />
                 </View>
                 <View className="flex-1">
-                  <Typography className="text-white font-bold text-lg">
+                  <Typography
+                    style={{ fontFamily: "Inter-Bold" }}
+                    className="text-white text-lg"
+                  >
                     USSD Code
                   </Typography>
-                  <Typography className="text-[#8B949E] text-xs">
+                  <Typography
+                    style={{ fontFamily: "Inter" }}
+                    className="text-[#8B949E] text-xs"
+                  >
                     Quick, 1% fee
                   </Typography>
                 </View>
               </TouchableOpacity>
             </View>
-
-            {/* SECURE PAYMENT BADGE */}
-            <View className="items-center mt-8 mb-8">
-              <View className="flex-row items-center px-6 py-3 bg-[#21262D] border border-[#30363D] rounded-full">
-                <MaterialCommunityIcons name="lock" size={16} color="#8B949E" />
-                <Typography
-                  className="text-[#8B949E] text-[10px] ml-2 tracking-widest uppercase"
-                  weight="700"
-                >
-                  SECURE PAYMENT
-                </Typography>
-              </View>
-            </View>
-
-            {/* LEMONPAY GUARD CARD */}
-            <View className="bg-[#161B22] rounded-[24px] overflow-hidden p-6 relative">
-              <View className="absolute inset-0 opacity-10">
-                <LinearGradient
-                  colors={["transparent", "#00C896"]}
-                  className="flex-1"
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                />
-              </View>
-              <View className="items-center mb-4">
-                <MaterialCommunityIcons
-                  name="lock"
-                  size={80}
-                  color="#00C896"
-                  style={{ opacity: 0.6 }}
-                />
-              </View>
-              <Typography className="text-[#F5E642] font-bold text-lg mb-1">
-                LemonPay Guard
-              </Typography>
-              <Typography className="text-[#8B949E] text-sm">
-                Your funds are protected by 256-bit encryption.
-              </Typography>
-            </View>
           </View>
         </ScrollView>
 
-        {/* PROCEED BUTTON */}
+        {/* CONTINUE BUTTON */}
         <View className="absolute bottom-10 left-6 right-6">
-          <TouchableOpacity
-            onPress={handleContinue}
-            disabled={!amount || isPending}
-            style={{ opacity: !amount || isPending ? 0.6 : 1 }}
-          >
+          <TouchableOpacity onPress={handleContinue} disabled={isPending}>
             <LinearGradient
-              colors={
-                !amount || isPending
-                  ? ["#30363D", "#21262D"]
-                  : ["#F5E642", "#D4C200"]
-              }
-              className="h-16 rounded-[20px] items-center justify-center flex-row"
+              style={{
+                height: 56,
+                borderRadius: 12,
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+              }}
+              colors={["#F5E642", "#D4C200"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
               <Typography
-                className={`font-bold text-lg ${!amount || isPending ? "text-[#8B949E]" : "text-[#0D1117]"}`}
+                style={{ fontFamily: "Inter-Bold" }}
+                className="!text-[#0D1117] text-lg"
               >
-                {isPending ? "Connecting..." : "Continue →"}
+                Continue
               </Typography>
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </View>
+
+      {/* Amount Sheet */}
+      <Modal
+        visible={isAmountSheetVisible}
+        transparent={true}
+        animationType="slide"
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-[#161B22] rounded-t-[30px] p-6 pb-12">
+            <View className="flex-row justify-between items-center mb-6">
+              <Typography
+                style={{ fontFamily: "Inter-Bold" }}
+                className="text-white text-xl"
+              >
+                Enter Amount
+              </Typography>
+              <TouchableOpacity onPress={() => setIsAmountSheetVisible(false)}>
+                <MaterialIcons name="close" size={24} color="#8B949E" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="bg-[#0D1117] rounded-2xl p-6 mb-8 border border-[#30363D]">
+              <View className="flex-row items-center">
+                <Text
+                  style={{
+                    fontFamily: "Inter-Bold",
+                    color: "#F5E642",
+                    fontSize: 32,
+                    marginRight: 8,
+                  }}
+                >
+                  ₦
+                </Text>
+                <TextInput
+                  value={amount ? parseInt(amount).toLocaleString("en-NG") : ""}
+                  onChangeText={formatAmount}
+                  placeholder="0.00"
+                  placeholderTextColor="#30363D"
+                  keyboardType="numeric"
+                  className="flex-1 text-white text-4xl font-bold"
+                  autoFocus
+                />
+              </View>
+            </View>
+
+            {/* Quick Amounts */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mb-8"
+            >
+              {QUICK_AMOUNTS.map((amt) => (
+                <TouchableOpacity
+                  key={amt}
+                  onPress={() => setAmount(amt.toString())}
+                  className={`px-6 py-3 rounded-full border mr-3 ${
+                    amount === amt.toString()
+                      ? "bg-[#F5E642] border-[#F5E642]"
+                      : "bg-[#21262D] border-[#30363D]"
+                  }`}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "Inter-Bold",
+                      color: amount === amt.toString() ? "#0D1117" : "white",
+                      fontSize: 14,
+                    }}
+                  >
+                    ₦{amt.toLocaleString()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={handleInitializePayment}
+              disabled={isPending}
+            >
+              <LinearGradient
+                colors={["#F5E642", "#D4C200"]}
+                style={{
+                  height: 56,
+                  borderRadius: 12,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "row",
+                }}
+              >
+                <Typography
+                  style={{ fontFamily: "Inter-Bold" }}
+                  className="!text-[#0D1117] text-base"
+                >
+                  {isPending ? "Initializing..." : "Proceed to Payment"}
+                </Typography>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }

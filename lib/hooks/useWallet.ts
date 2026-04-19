@@ -27,13 +27,25 @@ export const useFundWallet = () => {
 
   return useMutation({
     mutationFn: async ({ amount, email }: FundWalletParams) => {
-      // NOTE: nested data.data in actual response — extract correctly:
-      // response.data.data.data = { authorization_url, ... }
+      console.log('[FUND WALLET] initiating with:', { amount, email });
       const response = await apiClient.post<any>(
         ENDPOINTS.WALLET.FUND,
         { amount, email },
       );
-      return response.data.data.data as FundWalletResponse;
+      console.log('[FUND WALLET] response:', JSON.stringify(response.data));
+      
+      // The axios interceptor likely returns response.data (outer wrapper removed)
+      // So response here = { success, message, data: innerWrapper }
+      // innerWrapper = { success, message, data: actualData }
+      const actualData = response.data?.data?.data ?? response.data?.data ?? response.data;
+      
+      console.log('[FUND WALLET] extracted actualData:', JSON.stringify(actualData));
+      
+      return {
+        authorization_url: actualData.authorization_url,
+        access_code: actualData.access_code,
+        reference: actualData.reference,
+      } as FundWalletResponse;
     },
     onSuccess: () => {
       // Invalidate balance queries after successful initiation

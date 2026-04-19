@@ -20,6 +20,10 @@ import {
   Minus,
   Bell,
   ArrowRight,
+  ShoppingBag,
+  Copy,
+  Receipt,
+  Plus,
 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
@@ -54,6 +58,7 @@ export default function CreateEscrowScreen() {
     buyer_terms: "",
     seller_identifier: "",
   });
+  const [rawAmount, setRawAmount] = useState("");
 
   const createEscrowMutation = useCreateEscrow();
 
@@ -65,6 +70,18 @@ export default function CreateEscrowScreen() {
   const handleBack = () => {
     if (step > 1) setStep(step - 1);
     else router.back();
+  };
+
+  const formatWithCommas = (val: string): string => {
+    const digits = val.replace(/[^0-9]/g, "");
+    if (!digits) return "";
+    return parseInt(digits, 10).toLocaleString("en-NG");
+  };
+
+  const handleAmountChange = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, "");
+    setRawAmount(digits);
+    setFormData((prev) => ({ ...prev, amount: digits }));
   };
 
   const handleCreate = async () => {
@@ -181,10 +198,8 @@ export default function CreateEscrowScreen() {
               keyboardType="numeric"
               placeholder="0.00"
               placeholderTextColor="#484f58"
-              value={formData.amount}
-              onChangeText={(text) =>
-                setFormData({ ...formData, amount: text })
-              }
+              value={rawAmount ? formatWithCommas(rawAmount) : ""}
+              onChangeText={handleAmountChange}
             />
           </View>
         </View>
@@ -258,7 +273,9 @@ export default function CreateEscrowScreen() {
           }
         />
 
-        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+        <View
+          style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}
+        >
           <View
             style={{
               width: 18,
@@ -443,7 +460,9 @@ export default function CreateEscrowScreen() {
           <User size={22} color="#8B949E" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 15 }}>
+          <Text
+            style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 15 }}
+          >
             {formData.seller_identifier || "Seller"}
           </Text>
           <View
@@ -477,12 +496,10 @@ export default function CreateEscrowScreen() {
           gap: 16,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-          <Clock
-            size={20}
-            color="#F5E642"
-            style={{ marginTop: 2 }}
-          />
+        <View
+          style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}
+        >
+          <Clock size={20} color="#F5E642" style={{ marginTop: 2 }} />
           <View style={{ flex: 1 }}>
             <Text
               style={{ fontFamily: "Inter-Bold", fontSize: 14, color: "white" }}
@@ -502,12 +519,10 @@ export default function CreateEscrowScreen() {
             </Text>
           </View>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-          <Shield
-            size={20}
-            color="#00C896"
-            style={{ marginTop: 2 }}
-          />
+        <View
+          style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}
+        >
+          <Shield size={20} color="#00C896" style={{ marginTop: 2 }} />
           <View style={{ flex: 1 }}>
             <Text
               style={{ fontFamily: "Inter-Bold", fontSize: 14, color: "white" }}
@@ -527,12 +542,10 @@ export default function CreateEscrowScreen() {
             </Text>
           </View>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-          <Scale
-            size={20}
-            color="#F5E642"
-            style={{ marginTop: 2 }}
-          />
+        <View
+          style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}
+        >
+          <Scale size={20} color="#F5E642" style={{ marginTop: 2 }} />
           <View style={{ flex: 1 }}>
             <Text
               style={{ fontFamily: "Inter-Bold", fontSize: 14, color: "white" }}
@@ -574,11 +587,17 @@ export default function CreateEscrowScreen() {
               alignItems: "center",
             }}
           >
-            <Text style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}>
+            <Text
+              style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}
+            >
               Purchase Price
             </Text>
             <Text
-              style={{ fontFamily: "Inter-Medium", color: "white", fontSize: 14 }}
+              style={{
+                fontFamily: "Inter-Medium",
+                color: "white",
+                fontSize: 14,
+              }}
             >
               {formatCurrency(amount)}
             </Text>
@@ -590,11 +609,17 @@ export default function CreateEscrowScreen() {
               alignItems: "center",
             }}
           >
-            <Text style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}>
+            <Text
+              style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}
+            >
               Escrow Fee (0.5%)
             </Text>
             <Text
-              style={{ fontFamily: "Inter-Medium", color: "white", fontSize: 14 }}
+              style={{
+                fontFamily: "Inter-Medium",
+                color: "white",
+                fontSize: 14,
+              }}
             >
               {formatCurrency(escrow_fee)}
             </Text>
@@ -606,11 +631,17 @@ export default function CreateEscrowScreen() {
               alignItems: "center",
             }}
           >
-            <Text style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}>
+            <Text
+              style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}
+            >
               Network Charge
             </Text>
             <Text
-              style={{ fontFamily: "Inter-Medium", color: "white", fontSize: 14 }}
+              style={{
+                fontFamily: "Inter-Medium",
+                color: "white",
+                fontSize: 14,
+              }}
             >
               {formatCurrency(network_charge)}
             </Text>
@@ -623,7 +654,9 @@ export default function CreateEscrowScreen() {
               alignItems: "center",
             }}
           >
-            <Text style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}>
+            <Text
+              style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}
+            >
               Total Amount
             </Text>
             <Text
@@ -692,7 +725,7 @@ export default function CreateEscrowScreen() {
         <Typography variant="label-sm" className="text-[#F5E642]">
           STEP 03 OF 03
         </Typography>
-        <Typography variant="display" className="text-white mt-1 mb-2">
+        <Typography variant="heading" className="text-white mt-1 mb-2">
           Final Review
         </Typography>
         <Typography variant="body" className="text-[#8B949E]">
@@ -773,27 +806,17 @@ export default function CreateEscrowScreen() {
               01
             </Text>
             <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontFamily: "Inter-Bold",
-                  color: "white",
-                  fontSize: 14,
-                  marginBottom: 4,
-                }}
+              <Typography
+                variant="body"
+                weight="700"
+                className="!text-white !text-base mb-[4px]"
               >
                 Inspection Period
-              </Text>
-              <Text
-                style={{
-                  fontFamily: "Inter",
-                  color: "#8B949E",
-                  fontSize: 12,
-                  lineHeight: 17,
-                }}
-              >
+              </Typography>
+              <Typography variant="caption" className="!text-[#8B949E] text-sm">
                 The buyer has a 72-hour window after delivery to inspect the
                 item and raise any disputes.
-              </Text>
+              </Typography>
             </View>
           </View>
 
@@ -811,27 +834,17 @@ export default function CreateEscrowScreen() {
               02
             </Text>
             <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontFamily: "Inter-Bold",
-                  color: "white",
-                  fontSize: 14,
-                  marginBottom: 4,
-                }}
+              <Typography
+                variant="body"
+                weight="700"
+                className="!text-white !text-base mb-[4px]"
               >
                 Release Conditions
-              </Text>
-              <Text
-                style={{
-                  fontFamily: "Inter",
-                  color: "#8B949E",
-                  fontSize: 12,
-                  lineHeight: 17,
-                }}
-              >
+              </Typography>
+              <Typography variant="caption" className="!text-[#8B949E] text-sm">
                 Funds will be released only upon explicit confirmation from the
                 buyer or after the inspection period expires.
-              </Text>
+              </Typography>
             </View>
           </View>
 
@@ -849,27 +862,17 @@ export default function CreateEscrowScreen() {
               03
             </Text>
             <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontFamily: "Inter-Bold",
-                  color: "white",
-                  fontSize: 14,
-                  marginBottom: 4,
-                }}
+              <Typography
+                variant="body"
+                weight="700"
+                className="!text-white !text-base mb-[4px]"
               >
                 Dispute Resolution
-              </Text>
-              <Text
-                style={{
-                  fontFamily: "Inter",
-                  color: "#8B949E",
-                  fontSize: 12,
-                  lineHeight: 17,
-                }}
-              >
+              </Typography>
+              <Typography variant="caption" className="!text-[#8B949E] text-sm">
                 Any disagreements will be handled by LemonPay's independent
                 mediators for a fair outcome.
-              </Text>
+              </Typography>
             </View>
           </View>
         </View>
@@ -893,20 +896,14 @@ export default function CreateEscrowScreen() {
           color="#F5E642"
           style={{ marginTop: 1, flexShrink: 0 }}
         />
-        <Text
-          style={{
-            fontFamily: "Inter",
-            color: "#8B949E",
-            fontSize: 12,
-            lineHeight: 18,
-            flex: 1,
-            fontStyle: "italic",
-          }}
+        <Typography
+          variant="caption"
+          className="flex-1 !text-[#8B949E] text-sm"
         >
           The seller will be able to review and suggest modifications before you
           both confirm. No funds will be moved until the final handshake is
           completed.
-        </Text>
+        </Typography>
       </View>
       <View style={{ height: 40 }} />
     </View>
@@ -952,7 +949,10 @@ export default function CreateEscrowScreen() {
               alignItems: "center",
               justifyContent: "center",
               flexDirection: "row",
-              opacity: (step === 2 && !isTermsAgreed) || createEscrowMutation.isPending ? 0.5 : 1,
+              opacity:
+                (step === 2 && !isTermsAgreed) || createEscrowMutation.isPending
+                  ? 0.5
+                  : 1,
             }}
           >
             <Typography
@@ -993,190 +993,174 @@ export default function CreateEscrowScreen() {
         transparent={true}
         animationType="fade"
       >
-        <View style={{ flex: 1, backgroundColor: "#0D1117", paddingHorizontal: 16 }}>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingVertical: 24,
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: "Inter-Bold",
-                color: "#F5E642",
-                fontSize: 20,
-              }}
-            >
+        <View style={{ flex: 1, backgroundColor: "#0D1117", paddingHorizontal: 20 }}>
+          {/* HEADER */}
+          <View style={{ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            paddingVertical: 24 
+          }}>
+            <Text style={{ 
+              fontFamily: "Inter-Bold", 
+              color: "#F5E642", 
+              fontSize: 20 
+            }}>
               LemonPay
             </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-              <Minus size={24} color="#8B949E" />
-              <Bell size={24} color="#8B949E" />
+            <View style={{ flexDirection: "row", gap: 16 }}>
+              <Minus size={22} color="#484f58" />
+              <Bell size={22} color="#484f58" />
             </View>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+            {/* SUCCESS HERO */}
             <View style={{ alignItems: "center", marginTop: 40, marginBottom: 32 }}>
-              <Animated.View
-                entering={ZoomIn.duration(400).springify()}
-                style={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: 40,
-                  backgroundColor: "#00C896",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 24,
+              <Animated.View 
+                entering={ZoomIn.springify()}
+                style={{ 
+                  width: 80, height: 80, borderRadius: 40, 
+                  backgroundColor: "#00C896", 
+                  alignItems: "center", justifyContent: "center",
+                  marginBottom: 24
                 }}
               >
-                <Check size={48} color="white" />
+                <Check size={48} color="white" strokeWidth={3} />
               </Animated.View>
-              <Text
-                style={{
-                  fontFamily: "Inter-Bold",
-                  color: "white",
-                  fontSize: 32,
-                  marginBottom: 8,
-                }}
-              >
+              <Text style={{ 
+                fontFamily: "Inter-Bold", color: "white", 
+                fontSize: 32, marginBottom: 8, textAlign: "center"
+              }}>
                 Escrow Created
               </Text>
-              <Text
-                style={{
-                  fontFamily: "Inter",
-                  color: "#8B949E",
-                  textAlign: "center",
-                  fontSize: 14,
-                  paddingHorizontal: 40,
-                }}
-              >
-                Agreement ID: LP-{createdEscrow?.id} is now active and awaiting
-                seller confirmation.
+              <Text style={{ 
+                fontFamily: "Inter", color: "#8B949E", 
+                fontSize: 14, textAlign: "center", lineHeight: 20
+              }}>
+                Agreement ID: LP-{createdEscrow?.id} is now active and awaiting seller confirmation.
               </Text>
             </View>
 
-            {/* Summary Card */}
-            <View
-              style={{
-                backgroundColor: "#161B22",
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: "#30363D",
-                padding: 16,
-                gap: 16,
-                marginBottom: 24,
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}
-                >
-                  Transaction Title
-                </Text>
-                <Text
-                  style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 14 }}
-                >
-                  {createdEscrow?.title}
-                </Text>
+            {/* SUMMARY CARD */}
+            <View style={{ 
+              backgroundColor: "#161B22", 
+              borderRadius: 16, 
+              borderWidth: 1, 
+              borderColor: "#30363D", 
+              padding: 16,
+              marginBottom: 20
+            }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <Text style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 12 }}>TOTAL AMOUNT</Text>
+                <Text style={{ fontFamily: "Inter-Bold", color: "#F5E642", fontSize: 16 }}>₦{formatWithCommas(createdEscrow?.amount || "0")}</Text>
               </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}
-                >
-                  Recipient
-                </Text>
-                <Text
-                  style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 14 }}
-                >
-                  {createdEscrow?.seller_identifier}
-                </Text>
+              <View style={{ height: 1, backgroundColor: "#30363D", marginBottom: 12 }} />
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <Text style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 12 }}>Asset</Text>
+                <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 14 }}>{createdEscrow?.title}</Text>
               </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 14 }}
-                >
-                  Amount
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: "Inter-Bold",
-                    color: "#F5E642",
-                    fontSize: 18,
-                  }}
-                >
-                  {formatCurrency(parseFloat(createdEscrow?.amount || "0"))}
-                </Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <Text style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 12 }}>Seller</Text>
+                <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 14 }}>{createdEscrow?.seller_identifier}</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ fontFamily: "Inter", color: "#8B949E", fontSize: 12 }}>Release Policy</Text>
+                <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 14 }}>On Delivery</Text>
               </View>
             </View>
 
-            {/* CTA Buttons */}
-            <View style={{ gap: 12, marginBottom: 40 }}>
-              <TouchableOpacity
+            {/* SHARE LINK CARD */}
+            <View style={{ 
+              backgroundColor: "#1C2128", 
+              borderRadius: 16, 
+              borderWidth: 1, 
+              borderColor: "#30363D", 
+              padding: 16,
+              marginBottom: 32
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <View style={{ 
+                  width: 32, height: 32, borderRadius: 8, 
+                  backgroundColor: "#F5E642", 
+                  alignItems: "center", justifyContent: "center"
+                }}>
+                  <Copy size={16} color="#0D1117" />
+                </View>
+                <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 16 }}>Share Agreement Link</Text>
+              </View>
+              <Text style={{ 
+                fontFamily: "Inter", color: "#8B949E", 
+                fontSize: 13, marginBottom: 16, lineHeight: 18
+              }}>
+                Send this link to the seller to review and accept the escrow terms.
+              </Text>
+              <View style={{ 
+                flexDirection: "row", 
+                backgroundColor: "#0D1117", 
+                borderRadius: 10, 
+                padding: 4,
+                alignItems: "center"
+              }}>
+                <Text 
+                  numberOfLines={1}
+                  style={{ 
+                    flex: 1, fontFamily: "Inter", 
+                    color: "#8B949E", fontSize: 13, 
+                    paddingHorizontal: 12 
+                  }}
+                >
+                  {createdEscrow?.share_link}
+                </Text>
+                <TouchableOpacity 
+                  onPress={handleCopyLink}
+                  style={{ 
+                    backgroundColor: "#F5E642", 
+                    paddingHorizontal: 16, 
+                    paddingVertical: 8, 
+                    borderRadius: 8 
+                  }}
+                >
+                  <Text style={{ fontFamily: "Inter-Bold", color: "#0D1117", fontSize: 13 }}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* ACTION BUTTONS */}
+            <View style={{ gap: 16 }}>
+              <TouchableOpacity 
                 onPress={() => {
                   setIsSuccessModalVisible(false);
-                  router.push("/(tabs)/escrow");
+                  router.replace(`/escrow/${createdEscrow?.id}`);
                 }}
-                style={{
-                  height: 56,
-                  borderRadius: 14,
-                  backgroundColor: "#F5E642",
-                  flexDirection: "row",
-                  alignItems: "center",
+                style={{ 
+                  backgroundColor: "#21262D", 
+                  borderWidth: 1, 
+                  borderColor: "#30363D", 
+                  height: 56, 
+                  borderRadius: 14, 
+                  flexDirection: "row", 
+                  alignItems: "center", 
                   justifyContent: "center",
-                  gap: 8,
+                  gap: 10
                 }}
               >
-                <FileText size={20} color="#0D1117" />
-                <Text
-                  style={{
-                    fontFamily: "Inter-Bold",
-                    color: "#0D1117",
-                    fontSize: 16,
-                  }}
-                >
-                  View Transaction Details
-                </Text>
+                <Receipt size={20} color="white" />
+                <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 15 }}>View Transaction Details</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={handleCopyLink}
-                style={{
-                  height: 56,
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: "#30363D",
-                  alignItems: "center",
-                  justifyContent: "center",
+              <TouchableOpacity 
+                onPress={() => {
+                  setIsSuccessModalVisible(false);
+                  router.replace("/(tabs)");
                 }}
+                style={{ paddingVertical: 8 }}
               >
-                <Text
-                  style={{
-                    fontFamily: "Inter-Bold",
-                    color: "white",
-                    fontSize: 16,
-                  }}
-                >
-                  Copy Share Link
+                <Text style={{ 
+                  fontFamily: "Inter", color: "#8B949E", 
+                  fontSize: 15, textAlign: "center" 
+                }}>
+                  Back to Dashboard
                 </Text>
               </TouchableOpacity>
             </View>
