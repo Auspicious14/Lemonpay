@@ -70,22 +70,14 @@ export default function PinSetupScreen() {
           {/* Top Row: STEP & 100% */}
           <View className="flex-row justify-between items-center mb-4">
             <Typography
-              style={{
-                color: "#00C896",
-                fontSize: 11,
-                fontWeight: "700",
-                letterSpacing: 1.5,
-              }}
+              variant="label-sm"
+              className="!text-[#00C896] !font-inter-bold !tracking-wide"
             >
               STEP 3 OF 3
             </Typography>
             <Typography
-              style={{
-                color: "#00C896",
-                fontSize: 11,
-                fontWeight: "700",
-                letterSpacing: 1.5,
-              }}
+              variant="label-sm"
+              className="!text-[#00C896] !font-inter-bold !tracking-wide"
             >
               100%
             </Typography>
@@ -118,24 +110,10 @@ export default function PinSetupScreen() {
             >
               <Ionicons name="shield-checkmark" size={40} color="#00C896" />
             </View>
+            <Typography variant="display">Ironclad Guard</Typography>
             <Typography
-              style={{
-                color: "#FFFFFF",
-                fontSize: 32,
-                fontWeight: "800",
-                marginTop: 16,
-              }}
-            >
-              Ironclad Guard
-            </Typography>
-            <Typography
-              style={{
-                color: "#8B949E",
-                fontSize: 14,
-                textAlign: "center",
-                marginTop: 8,
-                paddingHorizontal: 20,
-              }}
+              variant="body"
+              className="!text-[#8B949E] !text-center "
             >
               Your wealth is protected by multi-layered biometric protocols and
               secure enclave technology.
@@ -168,25 +146,15 @@ export default function PinSetupScreen() {
               <Ionicons name="lock-closed" size={20} color="#00C896" />
             </View>
             <View style={{ marginLeft: 16, flex: 1 }}>
-              <Typography
-                style={{
-                  color: "#00C896",
-                  fontSize: 11,
-                  fontWeight: "700",
-                  letterSpacing: 1,
-                }}
-              >
+              <Typography variant="label-sm" className="!text-[#00C896]">
                 ENCRYPTED VAULT
               </Typography>
-              <Typography
-                style={{ color: "#8B949E", fontSize: 12, marginTop: 2 }}
-              >
+              <Typography variant="caption" className="!text-[#8B949E]">
                 Sensitive data is hashed and stored in isolated hardware layers.
               </Typography>
             </View>
           </View>
 
-          {/* PIN Input Section */}
           <View style={{ marginBottom: 32 }}>
             <View className="flex-row items-center mb-2">
               <MaterialCommunityIcons
@@ -196,14 +164,13 @@ export default function PinSetupScreen() {
                 style={{ marginRight: 8 }}
               />
               <Typography
-                style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "700" }}
+                variant="body"
+                className="!text-[#FFFFFF] !font-inter-bold"
               >
                 Transaction PIN
               </Typography>
             </View>
-            <Typography
-              style={{ color: "#8B949E", fontSize: 13, marginBottom: 16 }}
-            >
+            <Typography variant="caption" className="!text-[#8B949E] !mb-4">
               Set your 4-digit code for fund releases.
             </Typography>
 
@@ -223,11 +190,8 @@ export default function PinSetupScreen() {
                   }}
                 >
                   <Typography
-                    style={{
-                      color: "#FFFFFF",
-                      fontSize: 24,
-                      fontWeight: "800",
-                    }}
+                    variant="body"
+                    className="!text-[#FFFFFF] !font-inter-bold"
                   >
                     {pin.length > idx ? "•" : ""}
                   </Typography>
@@ -282,7 +246,8 @@ export default function PinSetupScreen() {
               }}
             >
               <Typography
-                style={{ color: "#0D1117", fontSize: 16, fontWeight: "800" }}
+                variant="body"
+                className="!text-[#0D1117] !font-inter-bold"
               >
                 {isPending ? "SECURING..." : "FINISH SETUP ✓"}
               </Typography>

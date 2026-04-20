@@ -37,16 +37,30 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    console.error(`[API RESPONSE ERROR] ${error.config?.url}:`, {
-      status: error.response?.status,
-      data: error.response?.data,
+    const status = error.response?.status;
+    const url = error.config?.url || "";
+
+    console.error(`[API ERROR] ${url}:`, {
+      status,
       message: error.message,
     });
 
-    if (error.response?.status === 401) {
-      console.log("[API] 401 Unauthorized - emitting session-expired");
-      appEvents.emit("session-expired");
+    if (status === 401) {
+      const isAuthEndpoint = [
+        "/auth/login-otp",
+        "/auth/pin-login",
+        "/auth/register",
+        "/auth/request-otp",
+        "/auth/verify-otp",
+        "/auth/me", // don't logout if /auth/me itself 401s (handled by background validator)
+      ].some((path) => url.includes(path));
+
+      if (!isAuthEndpoint) {
+        console.log("[API] 401 on protected route — session expired");
+        appEvents.emit("session-expired");
+      }
     }
+
     return Promise.reject(error);
   },
 );

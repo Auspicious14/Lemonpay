@@ -140,7 +140,10 @@ export default function EscrowSuccessScreen() {
                 Send this link to the seller to review the terms and confirm the
                 agreement.
               </Typography>
-              <View className="flex-row items-center bg-surface-container-lowest rounded-2xl p-2 pl-4 border border-outline-variant/20" style={{ gap: 8 }}>
+              <View
+                className="flex-row items-center bg-surface-container-lowest rounded-2xl p-2 pl-4 border border-outline-variant/20"
+                style={{ gap: 8 }}
+              >
                 <Typography
                   variant="caption"
                   className="text-primary-fixed font-inter-bold text-[10px] flex-1"
@@ -169,7 +172,7 @@ export default function EscrowSuccessScreen() {
               className="h-16 bg-surface-container-highest border border-outline-variant/20"
             />
             <TouchableOpacity
-              onPress={() => router.push("/(tabs)/home")}
+              onPress={() => router.push("/home")}
               className="py-4 items-center"
             >
               <Typography

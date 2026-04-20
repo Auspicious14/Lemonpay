@@ -70,7 +70,7 @@ export default function ProfileScreen() {
       {/* HEADER */}
       <View className="px-6 py-4 flex-row justify-between items-center bg-[#0D1117]">
         <TouchableOpacity
-          onPress={() => router.replace("/(tabs)/home")}
+          onPress={() => router.replace("/home")}
           className="flex-row items-center"
         >
           <ArrowLeft size={24} color="white" />
@@ -95,7 +95,11 @@ export default function ProfileScreen() {
             <View className="absolute -bottom-2 self-center">
               <Badge
                 status="released"
-                label={user?.account_type === "seller" ? "VERIFIED SELLER" : "VERIFIED BUYER"}
+                label={
+                  user?.account_type === "seller"
+                    ? "VERIFIED SELLER"
+                    : "VERIFIED BUYER"
+                }
                 className="bg-secondary-container rounded-full"
               />
             </View>

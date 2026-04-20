@@ -7,7 +7,7 @@ import React, {
   ReactNode,
 } from "react";
 import { useRouter, useSegments, usePathname } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, QueryClient } from "@tanstack/react-query";
 import { TokenStorage } from "../lib/storage";
 import { apiClient } from "../lib/api/client";
 import { appEvents } from "../lib/api/event-emitter";
@@ -35,14 +35,90 @@ interface AuthContextType {
   hasLaunched: boolean | null;
   hasPinSetup: boolean | null;
   login: (token: string, user: User, needsPin?: boolean) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (reason?: string) => Promise<void>;
   markAsLaunched: () => Promise<void>;
   markPinSetup: () => Promise<void>;
-  updateUser: (updates: Partial<User>) => void;
+  updateUser: (updates: Partial<User>) => Promise<void>;
   checkSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// At the top of the file, outside the component:
+let queryClientRef: QueryClient | null = null;
+let backgroundValidationTimer: ReturnType<typeof setTimeout> | null = null;
+
+// This function runs silently after the app loads.
+// When /auth/me doesn't exist (404) → does nothing.
+// When /auth/me exists → validates token + refreshes user data.
+// When /auth/me returns 401 → triggers logout.
+// Activates automatically with zero code changes needed.
+const validateSessionInBackground = (
+  token: string,
+  currentUser: object | null,
+) => {
+  // Debounce — don't fire multiple times in quick succession
+  if (backgroundValidationTimer) {
+    clearTimeout(backgroundValidationTimer);
+  }
+
+  backgroundValidationTimer = setTimeout(async () => {
+    try {
+      console.log("[SESSION-BG] Attempting /auth/me...");
+
+      const response = await apiClient.post("/auth/me");
+      const freshUser = response.data?.data ?? response.data;
+
+      if (freshUser && freshUser.id) {
+        console.log("[SESSION-BG] /auth/me success — refreshing user data");
+        await TokenStorage.saveUser(freshUser);
+
+        // Update React Query cache with fresh data
+        // The component re-renders automatically
+        queryClientRef?.setQueryData(["user-session"], freshUser);
+
+        console.log("[SESSION-BG] User data refreshed from server");
+      }
+    } catch (error: any) {
+      const status = error.response?.status;
+
+      if (status === 404) {
+        // Endpoint not ready yet — completely normal
+        // Do nothing, keep stored user
+        console.log(
+          "[SESSION-BG] /auth/me not found (404) — using stored user",
+        );
+        return;
+      }
+
+      if (status === 401) {
+        // Token is invalid or expired
+        console.log("[SESSION-BG] /auth/me 401 — token expired, logging out");
+        await TokenStorage.clearTokens();
+        queryClientRef?.setQueryData(["user-session"], null);
+        queryClientRef?.clear();
+        // Emit session expired event
+        appEvents.emit("session-expired");
+        return;
+      }
+
+      if (status === 403) {
+        console.log("[SESSION-BG] /auth/me 403 — forbidden, logging out");
+        await TokenStorage.clearTokens();
+        queryClientRef?.setQueryData(["user-session"], null);
+        appEvents.emit("session-expired");
+        return;
+      }
+
+      // Network error, timeout, 500 etc.
+      // Keep user logged in — not their fault
+      console.log(
+        "[SESSION-BG] /auth/me error (keeping session):",
+        error.message,
+      );
+    }
+  }, 2000); // 2 second delay — let the app finish loading first
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [hasLaunched, setHasLaunched] = useState<boolean | null>(null);
@@ -57,6 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const segments = useSegments();
   const pathname = usePathname();
 
+  useEffect(() => {
+    queryClientRef = queryClient;
+    return () => {
+      queryClientRef = null;
+    };
+  }, [queryClient]);
+
   // 1. Fetch initial tri-states
   useEffect(() => {
     const init = async () => {
@@ -64,8 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         TokenStorage.getHasLaunched(),
         TokenStorage.getPinSetup(),
       ]);
-      setHasLaunched(launched ?? false);
-      setHasPinSetup(!!pinSetup);
+      setHasLaunched(launched === "true");
+      setHasPinSetup(pinSetup === "true");
     };
     init();
   }, []);
@@ -76,18 +159,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: isQueryLoading,
     refetch: checkSession,
   } = useQuery({
-    queryKey: ["session"],
+    queryKey: ["user-session"],
     queryFn: async () => {
-      const token = await TokenStorage.getToken();
-      if (!token) return null;
+      console.log("[SESSION] Starting...");
+      const start = Date.now();
 
-      try {
-        console.log("[PERF] Validating session...");
-        const response = await apiClient.post("/auth/me");
-        return response.data.data as User;
-      } catch (err: any) {
-        throw err;
+      // Step 1: Check token exists
+      const token = await TokenStorage.getToken();
+      if (!token) {
+        console.log("[SESSION] No token — guest");
+        return null;
       }
+
+      // Step 2: Restore user from AsyncStorage immediately
+      // This ensures the app loads instantly on restart
+      const storedUser = (await TokenStorage.getUser()) as User | null;
+      console.log(
+        "[SESSION] Stored user:",
+        storedUser ? storedUser.email : "none",
+      );
+
+      // Step 3: Attempt /auth/me silently in background
+      // This automatically activates when backend adds the endpoint
+      validateSessionInBackground(token, storedUser);
+
+      // Step 4: Return stored user immediately
+      // App shows tabs without waiting for /auth/me
+      if (storedUser) {
+        console.log(`[SESSION] Restored in ${Date.now() - start}ms`);
+        return storedUser;
+      }
+
+      // Step 5: Has token but no stored user
+      // This only happens if storage was partially cleared
+      // Wait for background validation to complete
+      console.log(
+        "[SESSION] Token exists but no stored user — waiting for validation",
+      );
+      return null;
     },
     retry: false,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -178,44 +287,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = appEvents.on("session-expired", async () => {
       if (logoutInProgress.current) return;
       console.log("[AUTH] Session expired, logging out...");
-      await logout();
+      await logout("expired");
     });
     return () => unsubscribe();
   }, [user]);
 
-  const login = async (token: string, userData: User, needsPin?: boolean) => {
-    console.log("[AUTH] Login called", { needsPin });
-    await TokenStorage.setToken(token);
-    if (!needsPin) {
-      await markPinSetup();
-    }
-    queryClient.setQueryData(["session"], { ...userData, needsPin });
+  const login = async (token: string, user: User, needsPin?: boolean) => {
+    const start = Date.now();
+    console.log("[AUTH] login() — saving session");
+
+    const userData = { ...user, needsPin: needsPin ?? false };
+
+    // Save to AsyncStorage first — critical for persistence
+    await TokenStorage.saveToken(token);
+    await TokenStorage.saveUser(userData);
+
+    console.log("[AUTH] session saved to AsyncStorage");
+
+    // Update React Query cache
+    queryClient.setQueryData(["user-session"], userData);
+
+    // Invalidate after short delay to avoid race condition
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["user-session"] });
+    }, 300);
+
+    console.log(`[AUTH] login() done in ${Date.now() - start}ms`);
   };
 
-  const logout = async () => {
+  const logout = async (reason?: string) => {
     if (logoutInProgress.current) return;
     logoutInProgress.current = true;
-    console.log("[AUTH] Logout initiated (Clearing local state)");
+    console.log("[AUTH] logout — reason:", reason || "none");
+
+    // Cancel any pending background validation
+    if (backgroundValidationTimer) {
+      clearTimeout(backgroundValidationTimer);
+      backgroundValidationTimer = null;
+    }
 
     try {
-      // 1. Clear local session first (prioritize UX speed)
-      await TokenStorage.clearToken();
-      await TokenStorage.clearRefreshToken();
-      queryClient.setQueryData(["session"], null);
+      const token = await TokenStorage.getToken();
+      if (token) {
+        await apiClient.post("/auth/logout");
+      }
+    } catch (error) {
+      // Always clear locally even if API fails
+      console.error("[AUTH] logout API error (ignored):", error);
+    } finally {
+      await TokenStorage.clearTokens();
+      queryClient.setQueryData(["user-session"], null);
       queryClient.clear();
 
-      // 2. Clear route (use '/login' instead of '/(auth)/login' for better path matching)
-      router.replace("/login");
+      if (reason === "expired") {
+        router.replace("/(auth)/login?message=session_expired");
+      } else {
+        router.replace("/(auth)/login");
+      }
 
-      // 3. Optional: Notify backend (background)
-      apiClient.post("/auth/logout").catch(() => {});
-    } finally {
       logoutInProgress.current = false;
     }
   };
 
   const markAsLaunched = async () => {
-    await TokenStorage.setHasLaunched(true);
+    await TokenStorage.setHasLaunched();
     setHasLaunched(true);
   };
 
@@ -224,11 +359,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setHasPinSetup(true);
   };
 
-  const updateUser = (updates: Partial<User>) => {
-    queryClient.setQueryData(["session"], (old: User | null) => {
-      if (!old) return null;
-      return { ...old, ...updates };
-    });
+  const updateUser = async (updates: Partial<User>) => {
+    const current = queryClient.getQueryData<User>(["user-session"]);
+    if (!current) return;
+    const updated = { ...current, ...updates };
+    queryClient.setQueryData(["user-session"], updated);
+    await TokenStorage.saveUser(updated);
+    console.log("[AUTH] updateUser saved");
   };
 
   const value = {
@@ -243,7 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     markPinSetup,
     updateUser,
     checkSession: async () => {
-      await checkSession();
+      await queryClient.invalidateQueries({ queryKey: ["user-session"] });
     },
   };
 

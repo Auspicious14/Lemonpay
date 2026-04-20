@@ -51,8 +51,8 @@ export const Screen: React.FC<ScreenProps> = ({
             )}
             {title && (
               <Typography
-                variant="heading"
-                className="flex-1 text-white"
+                variant="subheading"
+                className="flex-1 !text-primary-fixed"
                 numberOfLines={1}
                 weight="700"
               >

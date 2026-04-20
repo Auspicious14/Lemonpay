@@ -1,138 +1,79 @@
-import * as SecureStore from "expo-secure-store";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const KEYS = {
-  TOKEN: "lemonpay_access_token",
-  REFRESH_TOKEN: "lemonpay_refresh_token",
-  HAS_LAUNCHED: "lemonpay_has_launched",
-  PIN_SETUP: "lemonpay_pin_setup",
-  SAVED_EMAIL: "lemonpay_saved_email",
-};
+  ACCESS_TOKEN: 'lemonpay_access_token',
+  HAS_LAUNCHED: 'lemonpay_has_launched',
+  PIN_SETUP:    'lemonpay_pin_setup',
+  SAVED_EMAIL:  'lemonpay_saved_email',
+  USER_DATA:    'lemonpay_user_data',
+} as const
 
 export const TokenStorage = {
-  async setToken(token: string) {
+  // TOKEN
+  saveToken: async (token: string): Promise<void> => {
+    await AsyncStorage.setItem(KEYS.ACCESS_TOKEN, token)
+    console.log('[STORAGE] saveToken: saved')
+  },
+
+  getToken: async (): Promise<string | null> => {
+    const token = await AsyncStorage.getItem(KEYS.ACCESS_TOKEN)
+    console.log('[STORAGE] getToken:', token ? 'EXISTS' : 'NULL')
+    return token
+  },
+
+  // USER
+  saveUser: async (user: object): Promise<void> => {
+    await AsyncStorage.setItem(KEYS.USER_DATA, JSON.stringify(user))
+    console.log('[STORAGE] saveUser:', (user as any).email)
+  },
+
+  getUser: async (): Promise<object | null> => {
+    const raw = await AsyncStorage.getItem(KEYS.USER_DATA)
+    if (!raw) return null
     try {
-      if (Platform.OS === "web") {
-        await AsyncStorage.setItem(KEYS.TOKEN, token);
-      } else {
-        await SecureStore.setItemAsync(KEYS.TOKEN, token);
-      }
-    } catch (e) {
-      console.error("[STORAGE] Error setting token", e);
+      return JSON.parse(raw)
+    } catch {
+      return null
     }
   },
 
-  async getToken() {
-    try {
-      if (Platform.OS === "web") {
-        return await AsyncStorage.getItem(KEYS.TOKEN);
-      }
-      return await SecureStore.getItemAsync(KEYS.TOKEN);
-    } catch (e) {
-      return null;
-    }
+  clearUser: async (): Promise<void> => {
+    await AsyncStorage.removeItem(KEYS.USER_DATA)
   },
 
-  async clearToken() {
-    try {
-      if (Platform.OS === "web") {
-        await AsyncStorage.removeItem(KEYS.TOKEN);
-      } else {
-        await SecureStore.deleteItemAsync(KEYS.TOKEN);
-      }
-    } catch (e) {
-      console.error("[STORAGE] Error clearing token", e);
-    }
+  // LAUNCHED
+  getHasLaunched: async (): Promise<string | null> => {
+    return AsyncStorage.getItem(KEYS.HAS_LAUNCHED)
   },
 
-  async setRefreshToken(token: string) {
-    try {
-      if (Platform.OS === "web") {
-        await AsyncStorage.setItem(KEYS.REFRESH_TOKEN, token);
-      } else {
-        await SecureStore.setItemAsync(KEYS.REFRESH_TOKEN, token);
-      }
-    } catch (e) {
-      console.error("[STORAGE] Error setting refresh token", e);
-    }
+  setHasLaunched: async (): Promise<void> => {
+    await AsyncStorage.setItem(KEYS.HAS_LAUNCHED, 'true')
   },
 
-  async getRefreshToken() {
-    try {
-      if (Platform.OS === "web") {
-        return await AsyncStorage.getItem(KEYS.REFRESH_TOKEN);
-      }
-      return await SecureStore.getItemAsync(KEYS.REFRESH_TOKEN);
-    } catch (e) {
-      return null;
-    }
+  // PIN
+  getPinSetup: async (): Promise<string | null> => {
+    return AsyncStorage.getItem(KEYS.PIN_SETUP)
   },
 
-  async clearRefreshToken() {
-    try {
-      if (Platform.OS === "web") {
-        await AsyncStorage.removeItem(KEYS.REFRESH_TOKEN);
-      } else {
-        await SecureStore.deleteItemAsync(KEYS.REFRESH_TOKEN);
-      }
-    } catch (e) {
-      console.error("[STORAGE] Error clearing refresh token", e);
-    }
+  setPinSetup: async (): Promise<void> => {
+    await AsyncStorage.setItem(KEYS.PIN_SETUP, 'true')
   },
 
-  async setHasLaunched(value: boolean) {
-    try {
-      await AsyncStorage.setItem(KEYS.HAS_LAUNCHED, JSON.stringify(value));
-    } catch (e) {
-      console.error("[STORAGE] Error setting hasLaunched", e);
-    }
+  // EMAIL
+  getSavedEmail: async (): Promise<string | null> => {
+    return AsyncStorage.getItem(KEYS.SAVED_EMAIL)
   },
 
-  async getHasLaunched(): Promise<boolean | null> {
-    try {
-      const val = await AsyncStorage.getItem(KEYS.HAS_LAUNCHED);
-      return val ? JSON.parse(val) : null;
-    } catch (e) {
-      return null;
-    }
+  setSavedEmail: async (email: string): Promise<void> => {
+    await AsyncStorage.setItem(KEYS.SAVED_EMAIL, email)
   },
 
-  async getPinSetup(): Promise<string | null> {
-    try {
-      return await AsyncStorage.getItem(KEYS.PIN_SETUP);
-    } catch (e) {
-      return null;
-    }
+  // CLEAR — clears token + user only, not hasLaunched or email
+  clearTokens: async (): Promise<void> => {
+    await AsyncStorage.multiRemove([
+      KEYS.ACCESS_TOKEN,
+      KEYS.USER_DATA,
+    ])
+    console.log('[STORAGE] clearTokens: done')
   },
-
-  async setPinSetup(): Promise<void> {
-    try {
-      await AsyncStorage.setItem(KEYS.PIN_SETUP, "true");
-    } catch (e) {
-      console.error("[STORAGE] Error setting pinSetup", e);
-    }
-  },
-
-  async getSavedEmail(): Promise<string | null> {
-    try {
-      return await AsyncStorage.getItem(KEYS.SAVED_EMAIL);
-    } catch (e) {
-      return null;
-    }
-  },
-
-  async setSavedEmail(email: string): Promise<void> {
-    try {
-      await AsyncStorage.setItem(KEYS.SAVED_EMAIL, email);
-    } catch (e) {
-      console.error("[STORAGE] Error setting savedEmail", e);
-    }
-  },
-
-  async clearAll() {
-    await this.clearToken();
-    await this.clearRefreshToken();
-    // Note: We don't usually clear hasLaunched or pinSetup on logout
-  },
-};
+}

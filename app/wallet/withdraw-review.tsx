@@ -1,5 +1,10 @@
 import React from "react";
-import { View, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
@@ -17,12 +22,13 @@ import { LinearGradient } from "expo-linear-gradient";
 export default function WithdrawReviewScreen() {
   const router = useRouter();
   const showToast = useToastStore((state) => state.show);
-  const { amount, bankAccountId, bankName, accountNumber } = useLocalSearchParams<{
-    amount: string;
-    bankAccountId: string;
-    bankName: string;
-    accountNumber: string;
-  }>();
+  const { amount, bankAccountId, bankName, accountNumber } =
+    useLocalSearchParams<{
+      amount: string;
+      bankAccountId: string;
+      bankName: string;
+      accountNumber: string;
+    }>();
 
   const withdrawMutation = useWithdraw();
 
@@ -36,14 +42,14 @@ export default function WithdrawReviewScreen() {
         amount: amount!,
         bank_account_id: parseInt(bankAccountId!),
       });
-      
+
       router.replace({
         pathname: "/wallet/withdraw-success",
         params: {
           amount: amount,
           bank: bankName,
-          reference: result.reference
-        }
+          reference: result.reference,
+        },
       });
     } catch (error: any) {
       showToast(error.response?.data?.message || "Withdrawal failed", "error");
@@ -51,16 +57,13 @@ export default function WithdrawReviewScreen() {
   };
 
   return (
-    <Screen
-      className="bg-[#0D1117]"
-      withPadding={false}
-    >
+    <Screen className="bg-[#0D1117]" withPadding={false}>
       <View className="flex-row items-center px-4 pt-4 pb-2">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <ArrowLeft size={24} color="#F5E642" />
         </TouchableOpacity>
         <Typography
-          style={{ fontFamily: 'Inter-Bold' }}
+          style={{ fontFamily: "Inter-Bold" }}
           className="text-white text-xl"
         >
           Review Withdrawal
@@ -70,45 +73,45 @@ export default function WithdrawReviewScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         className="flex-1 px-4 pt-6"
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 150 }}
       >
         <View className="mb-8">
           <Typography
-            style={{ fontFamily: 'Inter-Bold', fontSize: 10 }}
+            style={{ fontFamily: "Inter-Bold", fontSize: 10 }}
             className="text-[#F5E642] uppercase mb-2"
           >
             TRANSACTION SUMMARY
           </Typography>
           <Typography
-            style={{ fontFamily: 'Inter-ExtraBold', fontSize: 32, lineHeight: 38 }}
+            style={{
+              fontFamily: "Inter-ExtraBold",
+              fontSize: 32,
+              lineHeight: 38,
+            }}
             className="text-white mb-2"
           >
             Confirm Your{"\n"}Transfer
           </Typography>
           <Typography
-            style={{ fontFamily: 'Inter', fontSize: 14 }}
+            style={{ fontFamily: "Inter", fontSize: 14 }}
             className="text-[#8B949E]"
           >
-            Review the details below to ensure accuracy before authorizing the fund release.
+            Review the details below to ensure accuracy before authorizing the
+            fund release.
           </Typography>
         </View>
 
-        {/* Breakdown Card */}
         <View className="bg-[#161B22] rounded-[24px] overflow-hidden mb-6">
-          {/* Top Half */}
           <View className="p-5">
             <View className="items-center mb-6">
-              <Typography
-                style={{ fontFamily: 'Inter', fontSize: 12 }}
-                className="text-[#8B949E] mb-1"
-              >
+              <Typography variant="caption" className="text-[#8B949E] mb-1">
                 Final Withdrawal Amount
               </Typography>
-              <Typography
-                style={{ fontFamily: 'Inter-ExtraBold', fontSize: 36 }}
-                className="text-[#F5E642]"
-              >
-                ₦{withdrawalAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+              <Typography variant="display" className="text-[#F5E642]">
+                ₦
+                {withdrawalAmount.toLocaleString("en-NG", {
+                  minimumFractionDigits: 2,
+                })}
               </Typography>
             </View>
 
@@ -116,23 +119,26 @@ export default function WithdrawReviewScreen() {
 
             <View className="flex-row justify-between items-center mb-4">
               <Typography
-                style={{ fontFamily: 'Inter', fontSize: 14 }}
+                style={{ fontFamily: "Inter", fontSize: 14 }}
                 className="text-[#8B949E]"
               >
                 Withdrawal Amount
               </Typography>
               <Typography
-                style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+                style={{ fontFamily: "Inter-Bold", fontSize: 14 }}
                 className="text-white"
               >
-                ₦{withdrawalAmount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                ₦
+                {withdrawalAmount.toLocaleString("en-NG", {
+                  minimumFractionDigits: 2,
+                })}
               </Typography>
             </View>
 
             <View className="flex-row justify-between items-center mb-4">
               <View className="flex-row items-center">
                 <Typography
-                  style={{ fontFamily: 'Inter', fontSize: 14 }}
+                  style={{ fontFamily: "Inter", fontSize: 14 }}
                   className="text-[#8B949E] mr-1"
                 >
                   Processing Fee
@@ -140,10 +146,13 @@ export default function WithdrawReviewScreen() {
                 <Info size={14} color="#8B949E" />
               </View>
               <Typography
-                style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+                style={{ fontFamily: "Inter-Bold", fontSize: 14 }}
                 className="text-white"
               >
-                ₦{processingFee.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                ₦
+                {processingFee.toLocaleString("en-NG", {
+                  minimumFractionDigits: 2,
+                })}
               </Typography>
             </View>
 
@@ -151,16 +160,19 @@ export default function WithdrawReviewScreen() {
 
             <View className="flex-row justify-between items-center">
               <Typography
-                style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+                style={{ fontFamily: "Inter-Bold", fontSize: 14 }}
                 className="text-white"
               >
                 Total to be Deducted
               </Typography>
               <Typography
-                style={{ fontFamily: 'Inter-Bold', fontSize: 16 }}
+                style={{ fontFamily: "Inter-Bold", fontSize: 16 }}
                 className="text-white"
               >
-                ₦{totalDeduction.toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+                ₦
+                {totalDeduction.toLocaleString("en-NG", {
+                  minimumFractionDigits: 2,
+                })}
               </Typography>
             </View>
           </View>
@@ -173,13 +185,13 @@ export default function WithdrawReviewScreen() {
               </View>
               <View>
                 <Typography
-                  style={{ fontFamily: 'Inter', fontSize: 10 }}
+                  style={{ fontFamily: "Inter", fontSize: 10 }}
                   className="text-[#8B949E] uppercase mb-0.5"
                 >
                   DESTINATION BANK
                 </Typography>
                 <Typography
-                  style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+                  style={{ fontFamily: "Inter-Bold", fontSize: 14 }}
                   className="text-white"
                 >
                   {bankName}
@@ -193,13 +205,17 @@ export default function WithdrawReviewScreen() {
               </View>
               <View>
                 <Typography
-                  style={{ fontFamily: 'Inter', fontSize: 10 }}
+                  style={{ fontFamily: "Inter", fontSize: 10 }}
                   className="text-[#8B949E] uppercase mb-0.5"
                 >
                   ACCOUNT NUMBER
                 </Typography>
                 <Typography
-                  style={{ fontFamily: 'Inter-Bold', fontSize: 14, letterSpacing: 2 }}
+                  style={{
+                    fontFamily: "Inter-Bold",
+                    fontSize: 14,
+                    letterSpacing: 2,
+                  }}
                   className="text-white"
                 >
                   {accountNumber}
@@ -216,16 +232,17 @@ export default function WithdrawReviewScreen() {
           </View>
           <View className="flex-1">
             <Typography
-              style={{ fontFamily: 'Inter-Bold', fontSize: 14 }}
+              style={{ fontFamily: "Inter-Bold", fontSize: 14 }}
               className="text-white mb-1"
             >
               Security Note
             </Typography>
             <Typography
-              style={{ fontFamily: 'Inter', fontSize: 12, lineHeight: 18 }}
+              style={{ fontFamily: "Inter", fontSize: 12, lineHeight: 18 }}
               className="text-[#8B949E]"
             >
-              Withdrawals are processed within minutes to your linked account. Please ensure your bank details are correct to avoid delays.
+              Withdrawals are processed within minutes to your linked account.
+              Please ensure your bank details are correct to avoid delays.
             </Typography>
           </View>
         </View>
@@ -233,44 +250,41 @@ export default function WithdrawReviewScreen() {
 
       {/* CTA Button */}
       <View className="absolute bottom-10 left-4 right-4">
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleConfirm}
           disabled={withdrawMutation.isPending}
           activeOpacity={0.8}
           className="mb-4"
         >
           <LinearGradient
-            colors={['#F5E642', '#D9CC3C']}
+            colors={["#F5E642", "#D9CC3C"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={{ 
-              height: 56, 
-              borderRadius: 14, 
-              flexDirection: 'row',
-              justifyContent: 'center', 
-              alignItems: 'center',
-              opacity: withdrawMutation.isPending ? 0.5 : 1
+            style={{
+              height: 56,
+              borderRadius: 14,
+              flexDirection: "row",
+              justifyContent: "center",
+              alignItems: "center",
+              opacity: withdrawMutation.isPending ? 0.5 : 1,
             }}
           >
             {withdrawMutation.isPending ? (
               <ActivityIndicator color="#0D1117" />
             ) : (
-              <Typography
-                style={{ fontFamily: 'Inter-Bold', fontSize: 16 }}
-                className="text-[#0D1117]"
-              >
+              <Typography variant="body" className="!text-[#0D1117]">
                 Confirm Withdrawal →
               </Typography>
             )}
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => router.back()}
           className="items-center"
         >
           <Typography
-            style={{ fontFamily: 'Inter-Medium', fontSize: 14 }}
+            style={{ fontFamily: "Inter-Medium", fontSize: 14 }}
             className="text-[#8B949E]"
           >
             Cancel Request
