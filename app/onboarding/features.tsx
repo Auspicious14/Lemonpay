@@ -30,9 +30,9 @@ export default function FeaturesSlide() {
           <Typography variant="subheading" className="text-white mb-2">
             Zero Latency
           </Typography>
-          <Typography variant="body" className="text-gray-400 mb-8">
+          <Typography variant="body" className="!text-gray-400 mb-8">
             Verified transactions are settled in{" "}
-            <Typography className="text-secondary">ms.</Typography>
+            <Typography className="!text-secondary">ms.</Typography>
           </Typography>
 
           <View>
@@ -41,7 +41,7 @@ export default function FeaturesSlide() {
             </Typography>
             <Typography
               variant="label-sm"
-              className="text-gray-500 uppercase tracking-widest mt-1"
+              className="!text-gray-500 uppercase tracking-widest mt-1"
             >
               UPTIME EFFICIENCY
             </Typography>
@@ -85,19 +85,19 @@ export default function FeaturesSlide() {
           <View className="flex-row justify-between mt-4">
             <Typography
               variant="label-sm"
-              className="text-secondary font-inter-bold"
+              className="!text-secondary font-inter-bold"
             >
               VERIFIED
             </Typography>
             <Typography
               variant="label-sm"
-              className="text-primary-fixed font-inter-bold"
+              className="!text-primary-fixed font-inter-bold"
             >
               SETTLING NOW
             </Typography>
             <Typography
               variant="label-sm"
-              className="text-gray-600 font-inter-bold"
+              className="!text-gray-600 font-inter-bold"
             >
               COMPLETED
             </Typography>

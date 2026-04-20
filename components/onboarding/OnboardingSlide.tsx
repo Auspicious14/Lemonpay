@@ -69,12 +69,12 @@ export const OnboardingSlide = ({
           </View>
           <Typography
             variant="subheading"
-            className="text-primary-fixed tracking-tight font-inter-bold"
+            className="!text-primary-fixed tracking-tight font-inter-bold"
           >
             LymePay{" "}
           </Typography>
         </View>
-        <Typography variant="label-sm" className="text-gray-500">
+        <Typography variant="label-sm" className="!text-gray-500">
           STEP {step.toString().padStart(2, "0")} /{" "}
           {totalSteps.toString().padStart(2, "0")}
         </Typography>
@@ -88,24 +88,24 @@ export const OnboardingSlide = ({
         <View className="mt-8 mb-6">
           {tag && (
             <View className="bg-surface-container-high self-start px-3 py-1 rounded-full mb-4">
-              <Typography variant="label-sm" className="text-gray-400">
+              <Typography variant="label-sm" className="!text-gray-400">
                 {tag}
               </Typography>
             </View>
           )}
 
           <View>
-            <Typography variant="display-lg" className="text-white">
+            <Typography variant="display-lg" className="!text-white">
               {title}
             </Typography>
             {titleAccent && (
-              <Typography variant="display-lg" className="text-primary-fixed">
+              <Typography variant="display-lg" className="!text-primary-fixed">
                 {titleAccent}
               </Typography>
             )}
           </View>
 
-          <Typography className="text-gray-400 text-lg mt-4 leading-7">
+          <Typography className="!text-gray-400 text-lg mt-4 leading-7">
             {description}
           </Typography>
         </View>
@@ -118,8 +118,9 @@ export const OnboardingSlide = ({
         <Button
           label={isLast ? "Get Started" : "Next"}
           onPress={handleNext}
-          rightIcon={<ChevronRight size={20} color="#1f1c00" />}
-          className="shadow-2xl shadow-primary-fixed/20"
+          rightIcon={<ChevronRight size={20} color="#1f1c00" className="!font-bold" />}
+          className="shadow-2xl shadow-primary-fixed/20 !text-black !rounded-md"
+          textClassName="!text-black !font-inter-bold"
         />
 
         {showSkip && !isLast && (

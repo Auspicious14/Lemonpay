@@ -40,7 +40,7 @@ export default function WelcomeSlide() {
           {/* Floating Card: Vault Status */}
           <Card
             variant="high"
-            className="absolute bottom-6 left-6 right-6 flex-row items-center p-4 bg-surface-container/90 border-outline-variant/20"
+            className="absolute bottom-6 left-6 right-6 flex-row items-center p-4 px-2 bg-surface-container/90 border-outline-variant/20"
           >
             <View className="w-12 h-12 bg-primary-fixed rounded-2xl items-center justify-center mr-4">
               <Lock size={20} color="#1f1c00" fill="#1f1c00" />
@@ -49,7 +49,7 @@ export default function WelcomeSlide() {
               <Typography variant="label" className="text-white">
                 VAULT STATUS
               </Typography>
-              <Typography variant="label-sm" className="text-secondary">
+              <Typography variant="label-sm" className="!text-secondary">
                 Secured by the LymePay Sentinel Protocol
               </Typography>
             </View>

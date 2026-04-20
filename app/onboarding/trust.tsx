@@ -29,7 +29,7 @@ export default function TrustSlide() {
             <Typography variant="label" className="text-white">
               Bank-Grade
             </Typography>
-            <Typography variant="label-sm" className="text-gray-500 mt-1">
+            <Typography variant="label-sm" className="!text-gray-500 mt-1">
               SECURITY
             </Typography>
           </Card>
@@ -41,7 +41,7 @@ export default function TrustSlide() {
             <Typography variant="label" className="text-white">
               Global
             </Typography>
-            <Typography variant="label-sm" className="text-gray-500 mt-1">
+            <Typography variant="label-sm" className="!text-gray-500 mt-1">
               STANDARD
             </Typography>
           </Card>
@@ -57,11 +57,11 @@ export default function TrustSlide() {
           <View className="flex-1">
             <Typography
               variant="body"
-              className="text-white font-inter-semibold"
+              className="!text-white font-inter-semibold"
             >
               Verified by Paystack
             </Typography>
-            <Typography variant="caption" className="text-gray-500">
+            <Typography variant="caption" className="!text-gray-500">
               Official Infrastructure Partner
             </Typography>
           </View>
@@ -84,7 +84,7 @@ export default function TrustSlide() {
           ].map((item, i) => (
             <View key={i} className="flex-row items-center mt-2">
               <View className="w-1 h-1 rounded-full bg-secondary mr-2" />
-              <Typography variant="caption" className="text-gray-400">
+              <Typography variant="caption" className="!text-gray-400">
                 {item}
               </Typography>
             </View>

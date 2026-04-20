@@ -42,14 +42,15 @@ export default function FinalSlide() {
           className="mt-4 p-6 bg-primary-fixed/5 border border-primary-fixed/20 items-center"
         >
           <Typography
-            variant="body"
-            className="text-primary-fixed font-inter-bold italic"
+            variant="caption"
+            weight="700"
+            className="!text-primary-fixed font-inter-bold"
           >
             "The gold standard for escrow commerce."
           </Typography>
           <Typography
             variant="label-sm"
-            className="text-gray-500 mt-2 uppercase"
+            className="!text-gray-500 mt-2 uppercase"
           >
             SENTINEL TIMES
           </Typography>
@@ -76,7 +77,7 @@ const BenefitItem = ({
       <Typography variant="body" className="text-white font-inter-semibold">
         {title}
       </Typography>
-      <Typography variant="caption" className="text-gray-500">
+      <Typography variant="caption" className="!text-gray-500">
         {desc}
       </Typography>
     </View>
