@@ -149,7 +149,7 @@ export default function EscrowSuccessScreen() {
                   className="text-primary-fixed font-inter-bold text-[10px] flex-1"
                   numberOfLines={1}
                 >
-                  lemonpay.me/escrow/LP-98273
+                  lymepay.me/escrow/LP-98273
                 </Typography>
                 <TouchableOpacity className="bg-primary-fixed px-4 py-2 rounded-xl active:scale-95 transition-transform">
                   <Typography

@@ -379,7 +379,7 @@ export default function EscrowDetailScreen() {
               style={{ fontFamily: "Inter" }}
               className="text-[#8B949E] text-xs mt-1"
             >
-              LemonPay mediators are reviewing the evidence provided.
+              LymePay mediators are reviewing the evidence provided.
             </Typography>
           </View>
         </View>
@@ -393,7 +393,7 @@ export default function EscrowDetailScreen() {
       {
         id: 1,
         title: "Payment Secured",
-        sub: "Funds locked in LemonPay vault.",
+        sub: "Funds locked in LymePay vault.",
         time: formatDate(escrow.funded_at || escrow.created_at),
       },
       {

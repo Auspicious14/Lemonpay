@@ -263,7 +263,7 @@ export default function PinSetupScreen() {
               letterSpacing: 0.5,
             }}
           >
-            AUTHORIZED BY LEMONPAY SECURITY PROTOCOL V4.2
+            AUTHORIZED BY LYMEPAY SECURITY PROTOCOL V4.2
           </Typography>
         </ScrollView>
 

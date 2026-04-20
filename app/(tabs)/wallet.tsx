@@ -23,7 +23,10 @@ import { useWalletBalance } from "@/lib/hooks/useWallet";
 import { useTransactions } from "@/lib/hooks/useTransactions";
 import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { TransactionRow, TransactionType } from "@/components/ui/TransactionRow";
+import {
+  TransactionRow,
+  TransactionType,
+} from "@/components/ui/TransactionRow";
 import { Avatar } from "@/components/ui/Avatar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useToastStore } from "@/store/useToastStore";
@@ -34,16 +37,16 @@ export default function WalletScreen() {
   const { user } = useAuth();
   const { show: showToast } = useToastStore();
 
-  const { 
-    data: balance, 
+  const {
+    data: balance,
     isLoading: isBalanceLoading,
-    refetch: refetchBalance 
+    refetch: refetchBalance,
   } = useWalletBalance();
 
-  const { 
-    data: transactionsData, 
+  const {
+    data: transactionsData,
     isLoading: isTransactionsLoading,
-    refetch: refetchTransactions 
+    refetch: refetchTransactions,
   } = useTransactions();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -72,9 +75,9 @@ export default function WalletScreen() {
             size="sm"
             className="rounded-full border-0 mr-3"
           />
-          <Text className="text-white font-inter-bold text-xl">LemonPay</Text>
+          <Text className="text-white font-inter-bold text-xl">LymePay</Text>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           className="w-10 h-10 items-center justify-center"
           onPress={() => router.push("/notifications")}
         >
@@ -149,7 +152,7 @@ export default function WalletScreen() {
           </View>
           <View className="flex-1">
             <Text className="text-white font-inter-bold text-lg">
-              Secure by LemonPay
+              Secure by LymePay
             </Text>
             <Text className="text-[#8B949E] font-inter text-xs mt-1">
               Your funds are held in a secure CBN-licensed escrow account.
@@ -166,27 +169,26 @@ export default function WalletScreen() {
           title="Recent Transactions"
           subtitle="Activity from the last 30 days"
           actionLabel="View All"
-          onAction={() => router.push("/wallet/history")}
+          onAction={() => router.push("/wallet/transactions")}
         />
 
         {isTransactionsLoading ? (
           <View className="bg-[#161B22] rounded-xl p-10 items-center justify-center mb-8">
-            <Text className="text-[#8B949E] font-inter">Loading transactions...</Text>
+            <Text className="text-[#8B949E] font-inter">
+              Loading transactions...
+            </Text>
           </View>
         ) : transactions.length > 0 ? (
           transactions.map((tx) => {
             const isCredit = tx.type === "credit";
-            
+
             let type: TransactionType = "funded";
             if (tx.description.includes("Escrow released")) type = "released";
-            if (tx.description.includes("Withdrawal")) type = "disputed"; // Red color
-            if (tx.description.includes("Wallet fund")) type = "funded"; // Yellow color
-
+            if (tx.description.includes("Withdrawal")) type = "disputed";
+            if (tx.description.includes("Wallet fund")) type = "funded";
+            console.log(tx.description, type);
             return (
-              <View
-                key={tx.id}
-                className="bg-[#161B22] rounded-lg p-4 mb-2"
-              >
+              <View key={tx.id} className="bg-[#161B22] rounded-lg p-4 mb-2">
                 <TransactionRow
                   type={type}
                   title={tx.description}
@@ -194,7 +196,13 @@ export default function WalletScreen() {
                   amount={parseFloat(tx.amount)}
                   isCredit={isCredit}
                   status={tx.status.toUpperCase()}
-                  statusColor={tx.status === "completed" ? "success" : tx.status === "pending" ? "pending" : "danger"}
+                  statusColor={
+                    tx.status === "completed"
+                      ? "success"
+                      : tx.status === "pending"
+                        ? "pending"
+                        : "danger"
+                  }
                 />
               </View>
             );

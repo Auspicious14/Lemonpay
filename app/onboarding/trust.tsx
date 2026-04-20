@@ -16,7 +16,7 @@ export default function TrustSlide() {
       tag="GOVERNANCE & TRUST"
       title="Absolute"
       titleAccent="Transparency"
-      description="LemonPay uses bank-grade security and industry standard encryption to protect your funds and ensure every transaction is traceable."
+      description="LymePay uses bank-grade security and industry standard encryption to protect your funds and ensure every transaction is traceable."
       onNext={() => router.push("/onboarding/final")}
     >
       <View className="gap-6 py-4">

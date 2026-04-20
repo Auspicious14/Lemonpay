@@ -141,7 +141,7 @@ export default function RegisterScreen() {
           <View className="flex-row items-center mb-6">
             <Ionicons name="shield-checkmark" size={20} color="#F5E642" />
             <Typography variant="subheading" className="!text-primary-fixed">
-              LEMONPAY
+              LYMEPAY
             </Typography>
           </View>
 
@@ -200,7 +200,7 @@ export default function RegisterScreen() {
                   style={{ marginLeft: 16 }}
                 />
                 <TextInput
-                  placeholder="chinedu.o@lemonpay.com"
+                  placeholder="chinedu.o@lymepay.com"
                   placeholderTextColor="#484F58"
                   value={email}
                   onChangeText={setEmail}

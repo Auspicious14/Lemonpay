@@ -53,7 +53,7 @@ export default function OnboardingScreen() {
       title: "Secure",
       highlight: "Every Trade",
       description:
-        "The guardian of your digital commerce. We hold funds in a lemonpay vault until every promise is kept, ensuring absolute transparency in every transaction.",
+        "The guardian of your digital commerce. We hold funds in a lymepay vault until every promise is kept, ensuring absolute transparency in every transaction.",
       content: () => (
         <View className="items-center justify-center w-full aspect-square relative">
           {/* Main Vault Image Area */}
@@ -86,7 +86,7 @@ export default function OnboardingScreen() {
                   variant="caption"
                   className="text-[#43E5B1] font-inter-medium"
                 >
-                  Secured by LemonPay Protocol
+                  Secured by LymePay Protocol
                 </Typography>
               </View>
             </View>
@@ -268,7 +268,7 @@ export default function OnboardingScreen() {
             variant="heading"
             className="text-[#F5E642] font-inter-extrabold text-sm tracking-widest"
           >
-            {currentIndex === 0 ? "LemonPay" : "LemonPay"}
+            {currentIndex === 0 ? "LymePay" : "LymePay"}
           </Typography>
         </View>
         <Typography

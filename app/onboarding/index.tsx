@@ -15,7 +15,7 @@ export default function WelcomeSlide() {
       tag="ESCROW INTELLIGENCE 01"
       title="Secure"
       titleAccent="Every Trade"
-      description="The guardian of your digital commerce. We hold funds in a lemonpay vault until every promise is kept, ensuring absolute transparency in every transaction."
+      description="The guardian of your digital commerce. We hold funds in a lymepay vault until every promise is kept, ensuring absolute transparency in every transaction."
       onNext={() => router.push("/onboarding/features")}
     >
       <View className="items-center justify-center py-6">
@@ -50,7 +50,7 @@ export default function WelcomeSlide() {
                 VAULT STATUS
               </Typography>
               <Typography variant="label-sm" className="text-secondary">
-                Secured by the LemonPay Sentinel Protocol
+                Secured by the LymePay Sentinel Protocol
               </Typography>
             </View>
           </Card>

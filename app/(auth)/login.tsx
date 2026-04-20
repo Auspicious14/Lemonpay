@@ -286,7 +286,7 @@ export default function LoginScreen() {
             <Typography variant="caption" className="!text-[#8B949E]">
               Don't have an account?{" "}
               <Typography variant="caption" className="!text-primary-fixed">
-                Join LemonPay
+                Join LymePay
               </Typography>
             </Typography>
           </TouchableOpacity>

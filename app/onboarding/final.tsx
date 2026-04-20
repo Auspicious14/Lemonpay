@@ -13,7 +13,7 @@ export default function FinalSlide() {
       tag="READY TO START"
       title="Join the"
       titleAccent="Network"
-      description="Join thousands of secure traders on the LemonPay protocol. Your first transaction is minutes away."
+      description="Join thousands of secure traders on the LymePay protocol. Your first transaction is minutes away."
       isLast
       onNext={() => {}}
     >

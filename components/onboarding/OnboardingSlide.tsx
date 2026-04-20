@@ -71,7 +71,7 @@ export const OnboardingSlide = ({
             variant="subheading"
             className="text-primary-fixed tracking-tight font-inter-bold"
           >
-            LemonPay{" "}
+            LymePay{" "}
           </Typography>
         </View>
         <Typography variant="label-sm" className="text-gray-500">

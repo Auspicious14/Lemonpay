@@ -49,7 +49,7 @@ export default function AccountTypeScreen() {
         <View className="flex-row items-center mb-6">
           <Ionicons name="shield-checkmark" size={20} color="#F5E642" />
           <Typography variant="subheading" className="!text-primary-fixed">
-            LEMONPAY
+            LYMEPAY
           </Typography>
         </View>
 

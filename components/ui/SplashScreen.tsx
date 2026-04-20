@@ -30,7 +30,7 @@ export const SplashScreen = () => {
         style={{ transform: [{ scale: pulseAnim }], alignItems: "center" }}
       >
         <Text style={styles.logo}>🍋</Text>
-        <Text style={styles.wordmark}>LemonPay</Text>
+        <Text style={styles.wordmark}>LymePay</Text>
       </Animated.View>
     </View>
   );

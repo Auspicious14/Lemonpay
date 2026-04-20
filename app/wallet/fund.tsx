@@ -77,7 +77,7 @@ export default function FundWalletScreen() {
       // even if the redirect doesn't perfectly match.
       const result = await WebBrowser.openAuthSessionAsync(
         response.authorization_url,
-        "lemonpay://",
+        "lymepay://",
       );
 
       console.log('[FUND] Auth session result:', result.type);
@@ -113,7 +113,7 @@ export default function FundWalletScreen() {
           </Typography>
         </View>
         <Typography variant="body" className="!text-[#F5E642]" weight="800">
-          LEMONPAY
+          LYMEPAY
         </Typography>
       </View>
 

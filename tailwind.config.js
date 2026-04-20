@@ -6,7 +6,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // High-End Editorial Palette (The LemonPay)
+        // High-End Editorial Palette (The LymePay)
         surface: {
           DEFAULT: "#10141a",
           dim: "#10141a",

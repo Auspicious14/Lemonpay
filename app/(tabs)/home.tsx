@@ -144,11 +144,11 @@ export default function HomeScreen() {
             </Text>
           </View>
           <Text 
-            style={{ fontFamily: 'Inter-Bold' }}
-            className="text-white text-xl"
-          >
-            LemonPay
-          </Text>
+              style={{ fontFamily: 'Inter-Bold' }}
+              className="text-white text-xl"
+            >
+              LymePay
+            </Text>
         </View>
         <View className="flex-row items-center gap-x-4">
           <TouchableOpacity 
@@ -267,7 +267,7 @@ export default function HomeScreen() {
                 style={{ fontFamily: 'Inter' }}
                 className="text-[#8B949E] text-[10px] ml-1 uppercase"
               >
-                Secure by LemonPay Guard
+                Secure by LymePay Guard
               </Text>
             </View>
           </View>
@@ -383,7 +383,31 @@ export default function HomeScreen() {
 
         {/* RECENT TRANSACTIONS SECTION */}
         <View className="mt-8 mb-24">
-          <SectionHeader title="Recent Transactions" />
+          <View style={{ 
+            flexDirection: 'row', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: 16, 
+          }}> 
+            <Text style={{ 
+              fontFamily: 'Inter-Bold', 
+              color: 'white', 
+              fontSize: 20 
+            }}> 
+              Recent Transactions 
+            </Text> 
+            <TouchableOpacity 
+              onPress={() => router.push('/wallet/transactions')} 
+            > 
+              <Text style={{ 
+                fontFamily: 'Inter-Bold', 
+                color: '#F5E642', 
+                fontSize: 13 
+              }}> 
+                View All → 
+              </Text> 
+            </TouchableOpacity> 
+          </View> 
           <View className="bg-[#161B22] rounded-xl px-5">
             {isTransactionsLoading ? (
               <View className="py-10 items-center">
@@ -445,7 +469,7 @@ export default function HomeScreen() {
             style={{ fontFamily: 'Inter-Bold' }}
             className="text-[#8B949E] text-[8px] ml-1 tracking-widest uppercase"
           >
-            SECURE BY LEMONPAY GUARD V2.4
+            SECURE BY LYMEPAY GUARD V2.4
           </Text>
         </View>
       </View>

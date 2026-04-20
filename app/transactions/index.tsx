@@ -105,7 +105,7 @@ export default function TransactionHistoryScreen() {
       title="Transaction History"
       rightAction={
         <Typography variant="heading" className="text-primary-fixed font-black">
-          LemonPay
+          LymePay
         </Typography>
       }
     >
