@@ -90,6 +90,7 @@ export default function VerifyOtpScreen() {
               message: extractMessage(err),
               type: "error",
             });
+            console.log({err})
           },
         },
       );
@@ -146,18 +147,18 @@ export default function VerifyOtpScreen() {
             />
           ) : (
             <View className="flex-row justify-between items-center mb-12">
-              <Typography style={styles.accessText}>SECURITY ACCESS</Typography>
-              <Typography style={styles.verifyYellow}>VERIFY EMAIL</Typography>
+              <Typography variant="body">SECURITY ACCESS</Typography>
+              <Typography variant="body">VERIFY EMAIL</Typography>
             </View>
           )}
 
           {/* Heading */}
           <View className="items-center mb-12">
-            <Typography style={styles.heading}>Security Check.</Typography>
+            <Typography variant="display">Security Check.</Typography>
             <Typography style={styles.subtext}>
               We sent a code to your email.
             </Typography>
-            <Typography style={styles.emailText}>{email}</Typography>
+            <Typography variant="body" className="mt-2 !text-primary-fixed">{email}</Typography>
           </View>
 
           {/* Boxes Row + Keypad (Internal to OtpInput) */}
@@ -185,7 +186,7 @@ export default function VerifyOtpScreen() {
                   (otp.length !== 4 || isLoading) && { opacity: 0.6 },
                 ]}
               >
-                <Typography style={styles.buttonText}>
+                <Typography variant="body" className="!text-black !font-inter-bold">
                   {isLoading ? "VERIFYING..." : "Verify OTP"}
                 </Typography>
               </LinearGradient>
@@ -197,11 +198,8 @@ export default function VerifyOtpScreen() {
               </Typography>
               <TouchableOpacity onPress={handleResend} disabled={countdown > 0}>
                 <Typography
-                  style={{
-                    color: countdown > 0 ? "#484F58" : "#00C896",
-                    fontSize: 14,
-                    fontWeight: "800",
-                  }}
+                variant="caption"
+                  className={countdown > 0 ? "!text-gray-500" : "!text-primary-fixed"}
                 >
                   {countdown > 0 ? `Resend in ${countdown}s` : "Resend code"}
                 </Typography>
