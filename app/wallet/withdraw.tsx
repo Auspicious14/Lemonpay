@@ -80,10 +80,10 @@ export default function WithdrawFundsScreen() {
         setVerifiedName(null);
         setAccountName("");
         try {
+          console.log({ selectedBank, accountNumber });
           const result = await verifyMutation.mutateAsync({
             bank_code: selectedBank.code,
             account_number: accountNumber,
-            account_name: "",
           });
           setVerifiedName(result.verified_name);
           setAccountName(result.verified_name);
@@ -384,6 +384,7 @@ export default function WithdrawFundsScreen() {
         animationType="slide"
         transparent={true}
         statusBarTranslucent
+        className="h-96"
       >
         <View className="flex-1 bg-black/70 justify-end">
           <KeyboardAvoidingView
@@ -411,8 +412,9 @@ export default function WithdrawFundsScreen() {
                 {/* Select Bank Field */}
                 <View>
                   <Typography
-                    style={{ fontFamily: "Inter", fontSize: 10 }}
-                    className="text-[#8B949E] uppercase mb-2"
+                    variant="label"
+                    // style={{ fontFamily: "Inter", fontSize: 10 }}
+                    className="!text-[#8B949E] uppercase mb-2"
                   >
                     SELECT BANK
                   </Typography>
@@ -420,7 +422,7 @@ export default function WithdrawFundsScreen() {
                     onPress={() => setIsBankPickerVisible(true)}
                     className="bg-[#21262D] rounded-[16px] border border-[#30363D] p-4 flex-row items-center justify-between"
                   >
-                    <View className="flex-row items-center">
+                    <View className="flex-row gap-4 items-center">
                       <Landmark size={20} color="#8B949E" className="mr-3" />
                       <Typography
                         style={{ fontFamily: "Inter", fontSize: 14 }}
@@ -436,12 +438,12 @@ export default function WithdrawFundsScreen() {
                     <ChevronDown size={20} color="#8B949E" />
                   </TouchableOpacity>
                 </View>
-
                 {/* Account Number Field */}
                 <View>
                   <Typography
-                    style={{ fontFamily: "Inter", fontSize: 10 }}
-                    className="text-[#8B949E] uppercase mb-2"
+                    variant="label"
+                    // style={{ fontFamily: "Inter", fontSize: 10 }}
+                    className="!text-[#8B949E] uppercase !m-2"
                   >
                     ACCOUNT NUMBER
                   </Typography>
@@ -476,20 +478,9 @@ export default function WithdrawFundsScreen() {
                     )}
                   </View>
                 </View>
-
                 {/* Account Name Field */}
-                {isVerifying ? (
-                  <View className="py-4 items-center">
-                    <ActivityIndicator color="#F5E642" />
-                    <Typography
-                      style={{ fontFamily: "Inter", fontSize: 12 }}
-                      className="text-[#8B949E] mt-2"
-                    >
-                      Verifying account...
-                    </Typography>
-                  </View>
-                ) : verifiedName ? (
-                  <View className="bg-[#00C89626] border border-[#00C8964D] rounded-[16px] p-4 flex-row items-center">
+                {verifiedName && (
+                  <View className="bg-[#00C89626] border border-[#00C8964D] rounded-[16px] p-4 mt-4 flex-row items-center">
                     <View className="w-6 h-6 rounded-full bg-[#00C896] items-center justify-center mr-3">
                       <CheckCircle2 size={16} color="white" />
                     </View>
@@ -502,50 +493,13 @@ export default function WithdrawFundsScreen() {
                       </Typography>
                       <Typography
                         style={{ fontFamily: "Inter-Bold", fontSize: 18 }}
-                        className="text-white uppercase"
+                        className="!text-white uppercase"
                       >
                         {verifiedName}
                       </Typography>
                     </View>
                   </View>
-                ) : (
-                  <View>
-                    <Typography
-                      style={{ fontFamily: "Inter", fontSize: 10 }}
-                      className="text-[#8B949E] uppercase mb-2"
-                    >
-                      ACCOUNT NAME
-                    </Typography>
-                    <View
-                      className={`bg-[#21262D] rounded-[16px] border ${errors.accountName ? "border-red-500" : "border-[#30363D]"} p-4`}
-                    >
-                      <TextInput
-                        value={accountName}
-                        onChangeText={(text) => {
-                          setAccountName(text);
-                          if (errors.accountName)
-                            setErrors((prev) => ({
-                              ...prev,
-                              accountName: undefined,
-                            }));
-                        }}
-                        placeholder="Enter account name"
-                        placeholderTextColor="rgba(139, 148, 158, 0.3)"
-                        style={{
-                          fontFamily: "Inter-Bold",
-                          fontSize: 14,
-                          color: "white",
-                        }}
-                      />
-                    </View>
-                    {errors.accountName && (
-                      <Typography className="text-red-500 text-[10px] mt-1 ml-1">
-                        {errors.accountName}
-                      </Typography>
-                    )}
-                  </View>
                 )}
-
                 {/* NIBSS Note */}
                 <View className="flex-row items-center justify-center mt-2">
                   <Lock size={14} color="#8B949E" className="mr-2" />
@@ -556,7 +510,6 @@ export default function WithdrawFundsScreen() {
                     Securely linked via NIBSS
                   </Typography>
                 </View>
-
                 {/* Add Bank Account Button */}
                 <TouchableOpacity
                   onPress={handleSaveBank}
@@ -586,7 +539,7 @@ export default function WithdrawFundsScreen() {
                       <>
                         <Typography
                           style={{ fontFamily: "Inter-Bold", fontSize: 16 }}
-                          className="text-[#0D1117] mr-2"
+                          className="!text-[#0D1117] mr-2"
                         >
                           Add Bank Account
                         </Typography>
