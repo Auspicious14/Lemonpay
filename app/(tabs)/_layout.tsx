@@ -77,6 +77,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="disputes"
+        options={{
+          title: "Disputes",
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon Icon={Scale} focused={focused} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Security",

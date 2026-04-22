@@ -70,3 +70,79 @@ export const useCreateDispute = () => {
     },
   });
 };
+
+interface CreateSupportTicketParams {
+  subject: string;
+  description: string;
+  attachment?: {
+    uri: string;
+    mimeType?: string;
+    fileName?: string;
+  };
+}
+
+export const useCreateSupportTicket = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CreateSupportTicketParams) => {
+      const formData = new FormData();
+      formData.append("subject", data.subject);
+      formData.append("description", data.description);
+
+      if (data.attachment) {
+        formData.append("attachment", {
+          uri: data.attachment.uri,
+          type: data.attachment.mimeType ?? "image/jpeg",
+          name: data.attachment.fileName ?? "support.jpg",
+        } as any);
+      }
+
+      const response = await apiClient.post<ApiResponse<Dispute>>(
+        ENDPOINTS.DISPUTES.CREATE, // Same as CREATE dispute
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["disputes"] });
+    },
+  });
+};
+
+export const useSubmitAdditionalEvidence = (uuid: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (attachment: { uri: string; mimeType?: string; fileName?: string }) => {
+      const formData = new FormData();
+      formData.append("attachment", {
+        uri: attachment.uri,
+        type: attachment.mimeType ?? "image/jpeg",
+        name: attachment.fileName ?? "evidence.jpg",
+      } as any);
+
+      // Fallback: if evidence endpoint doesn't exist, we just simulate it or use the detail endpoint
+      // Given the instructions, we should try to call a real endpoint if possible.
+      // But based on ENDPOINTS, it's not there. I'll add it to ENDPOINTS first.
+      const response = await apiClient.post<ApiResponse<Dispute>>(
+        ENDPOINTS.DISPUTES.EVIDENCE(uuid),
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dispute", uuid] });
+    },
+  });
+};

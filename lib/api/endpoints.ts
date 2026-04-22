@@ -39,6 +39,7 @@ export const ENDPOINTS = {
     LIST: "/disputes",
     DETAIL: (uuid: string) => `/disputes/${uuid}`,
     CREATE: "/disputes",
+    EVIDENCE: (uuid: string) => `/disputes/${uuid}/evidence`,
   },
   NOTIFICATIONS: {
     LIST: "/notifications/",

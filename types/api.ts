@@ -155,7 +155,18 @@ export interface Dispute {
   escrow_uuid: string;
   description: string;
   reason: "not_received" | "not_as_described" | "damaged" | "other";
-  status: string;
+  status: "open" | "under_review" | "evidence_review" | "resolved" | "disputed";
+  attachment?: string;
+  attachments?: { url: string; type: string }[];
+  resolution_notes?: string;
+  created_at: string;
+}
+
+export interface SupportTicket {
+  uuid: string;
+  subject: string;
+  description: string;
+  status: "open" | "closed";
   attachment?: string;
   created_at: string;
 }
