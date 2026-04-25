@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -28,6 +27,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Divider } from "@/components/ui/Divider";
 import { useToastStore } from "@/store/useToastStore";
+import { useDialogStore } from "@/store/useDialogStore";
 import { formatCurrency } from "@/lib/utils/format";
 import { useWalletBalance } from "@/lib/hooks/useWallet";
 
@@ -41,22 +41,22 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { show: showToast } = useToastStore();
+  const { show: showDialog } = useDialogStore();
   const { data: balance } = useWalletBalance();
 
   const [tfaEnabled, setTfaEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert("Logout Account", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-        },
+    showDialog({
+      title: "Logout Account",
+      message: "Are you sure you want to logout?",
+      confirmLabel: "Logout",
+      variant: "danger",
+      onConfirm: async () => {
+        await logout();
       },
-    ]);
+    });
   };
 
   const handleComingSoon = () => {

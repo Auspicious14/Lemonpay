@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -22,6 +21,7 @@ import { Typography } from "@/components/ui/Typography";
 import { useDisputeDetail, useSubmitAdditionalEvidence, useCreateSupportTicket } from "@/lib/hooks/useDisputes";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useToastStore } from "@/store/useToastStore";
+import { useDialogStore } from "@/store/useDialogStore";
 
 const LEMON_YELLOW = "#F5E642";
 const DARK_BG = "#161B22";
@@ -33,6 +33,7 @@ export default function AdditionalEvidenceScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
   const router = useRouter();
   const { show: showToast } = useToastStore();
+  const { show: showDialog } = useDialogStore();
 
   const { data: dispute, isLoading } = useDisputeDetail(uuid || "");
   const submitEvidenceMutation = useSubmitAdditionalEvidence(uuid || "");
@@ -54,7 +55,12 @@ export default function AdditionalEvidenceScreen() {
   const handlePickFiles = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Denied", "We need access to your gallery to upload evidence.");
+      showDialog({
+        title: "Permission Denied",
+        message: "We need access to your gallery to upload evidence.",
+        confirmLabel: "Understood",
+        cancelLabel: null as any,
+      });
       return;
     }
 

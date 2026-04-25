@@ -14,6 +14,7 @@ import {
   Inter_800ExtraBold,
 } from "@expo-google-fonts/inter";
 import { Toast } from "@/components/ui/Toast";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { SplashScreen } from "../components/ui/SplashScreen";
 import "../styles/global.css";
@@ -82,6 +83,7 @@ export default function RootLayout() {
             <StatusBar style="light" />
             <AppContent />
             <Toast />
+            <ConfirmDialog />
           </BottomSheetModalProvider>
         </AuthProvider>
       </QueryClientProvider>

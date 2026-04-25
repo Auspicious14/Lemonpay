@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
-  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -27,6 +26,7 @@ import { useEscrowDetail } from "@/lib/hooks/useEscrow";
 import { useCreateDispute } from "@/lib/hooks/useDisputes";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useToastStore } from "@/store/useToastStore";
+import { useDialogStore } from "@/store/useDialogStore";
 
 const LEMON_YELLOW = "#F5E642";
 const DARK_BG = "#161B22";
@@ -45,6 +45,7 @@ export default function RaiseDisputeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { show: showToast } = useToastStore();
+  const { show: showDialog } = useDialogStore();
 
   const { data: escrow, isLoading: isEscrowLoading } = useEscrowDetail(id || "");
   const [reason, setReason] = useState<typeof DISPUTE_REASONS[number]["id"] | null>(null);
@@ -57,7 +58,12 @@ export default function RaiseDisputeScreen() {
   const handlePickFiles = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Denied", "We need access to your gallery to upload evidence.");
+      showDialog({
+        title: "Permission Denied",
+        message: "We need access to your gallery to upload evidence.",
+        confirmLabel: "Understood",
+        cancelLabel: null as any,
+      });
       return;
     }
 

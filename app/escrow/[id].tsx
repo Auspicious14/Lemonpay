@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
   Modal,
   Text,
@@ -41,13 +40,16 @@ import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { getUserRole } from "@/lib/utils/escrow";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useToastStore } from "@/store/useToastStore";
+import { useDialogStore } from "@/store/useDialogStore";
 import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
 
 export default function EscrowDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
   const showToast = useToastStore((state) => state.show);
+  const showDialog = useDialogStore((state) => state.show);
 
   const {
     data: escrow,
@@ -156,28 +158,28 @@ export default function EscrowDetailScreen() {
       case "released":
         return {
           label: "RELEASED",
-          bg: "bg-[#00C896]/20",
-          text: "text-[#00C896]",
+          bg: "!bg-[#00C896]/20",
+          text: "!text-[#00C896]",
         };
       case "disputed":
         return {
           label: "DISPUTED",
-          bg: "bg-[#FF4D4F]/20",
-          text: "text-[#FF4D4F]",
+          bg: "!bg-[#FF4D4F]/20",
+          text: "!text-[#FF4D4F]",
         };
       case "funded":
-        return { label: "FUNDED", bg: "bg-blue-500/20", text: "text-blue-500" };
+        return { label: "FUNDED", bg: "!bg-blue-500/20", text: "!text-blue-500" };
       case "awaiting_buyer_release":
         return {
           label: "AWAITING RELEASE",
-          bg: "bg-[#F5E642]/20",
-          text: "text-[#F5E642]",
+          bg: "!bg-[#F5E642]/20",
+          text: "!text-[#F5E642]",
         };
       default:
         return {
           label: "ESCROW ACTIVE",
-          bg: "bg-[#2D3018]",
-          text: "text-[#F5E642]",
+          bg: "!bg-[#2D3018]",
+          text: "!text-[#F5E642]",
         };
     }
   };
@@ -195,24 +197,19 @@ export default function EscrowDetailScreen() {
   };
 
   const handleConfirmAgreement = async () => {
-    Alert.alert(
-      "Confirm Agreement",
-      "By agreeing, you lock the escrow terms. Are you sure?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm & Lock",
-          onPress: async () => {
-            try {
-              await confirmAgreementMutation.mutateAsync();
-              showToast("Escrow terms locked", "success");
-            } catch (error) {
-              console.error("Failed to confirm agreement", error);
-            }
-          },
-        },
-      ],
-    );
+    showDialog({
+      title: "Confirm Agreement",
+      message: "By agreeing, you lock the escrow terms. Are you sure?",
+      confirmLabel: "Lock",
+      onConfirm: async () => {
+        try {
+          await confirmAgreementMutation.mutateAsync();
+          showToast("Escrow terms locked", "success");
+        } catch (error) {
+          console.error("Failed to confirm agreement", error);
+        }
+      },
+    });
   };
 
   const handleFundEscrow = async () => {
@@ -220,78 +217,64 @@ export default function EscrowDetailScreen() {
     const balance = balanceData?.balance || 0;
 
     if (balance < amount) {
-      Alert.alert("Insufficient Balance", "Please fund your wallet first.");
+      showDialog({
+        title: "Insufficient Balance",
+        message: "Please fund your wallet first.",
+        confirmLabel: "Understood",
+        cancelLabel: null as any,
+      });
       return;
     }
 
-    Alert.alert(
-      "Fund Escrow",
-      `You are about to fund ${formatCurrency(amount)} from your wallet. Confirm?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Fund Now",
-          onPress: async () => {
-            try {
-              await fundEscrowMutation.mutateAsync();
-              showToast("Escrow funded successfully", "success");
-            } catch (error) {
-              console.error("Failed to fund escrow", error);
-            }
-          },
-        },
-      ],
-    );
+    showDialog({
+      title: "Fund Escrow",
+      message: `You are about to fund ${formatCurrency(amount)} from your wallet. Confirm?`,
+      confirmLabel: "Fund Now",
+      onConfirm: async () => {
+        try {
+          await fundEscrowMutation.mutateAsync();
+          showToast("Escrow funded successfully", "success");
+        } catch (error) {
+          console.error("Failed to fund escrow", error);
+        }
+      },
+    });
   };
 
   const handleMarkDelivered = async () => {
-    Alert.alert(
-      "Mark as Delivered",
-      "Confirm you've delivered the item/service?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Yes, Delivered",
-          onPress: async () => {
-            try {
-              await markDeliveredMutation.mutateAsync();
-              showToast("Marked as delivered", "success");
-            } catch (error) {
-              console.error("Failed to mark delivered", error);
-            }
-          },
-        },
-      ],
-    );
+    showDialog({
+      title: "Mark as Delivered",
+      message: "Confirm you've delivered the item/service?",
+      confirmLabel: "Yes, Delivered",
+      onConfirm: async () => {
+        try {
+          await markDeliveredMutation.mutateAsync();
+          showToast("Marked as delivered", "success");
+        } catch (error) {
+          console.error("Failed to mark delivered", error);
+        }
+      },
+    });
   };
 
   const handleConfirmDelivery = async () => {
-    Alert.alert(
-      "Release Funds",
-      "WARNING: This will release funds to the seller. Only confirm if you have received the item/service as described.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm & Release",
-          onPress: async () => {
-            try {
-              await confirmDeliveryMutation.mutateAsync();
-              showToast("Funds released to seller", "success");
-            } catch (error) {
-              console.error("Failed to confirm delivery", error);
-            }
-          },
-        },
-      ],
-    );
+    showDialog({
+      title: "Release Funds",
+      message: "WARNING: This will release funds to the seller. Only confirm if you have received the item/service as described.",
+      confirmLabel: "Confirm & Release",
+      onConfirm: async () => {
+        try {
+          await confirmDeliveryMutation.mutateAsync();
+          showToast("Funds released to seller", "success");
+        } catch (error) {
+          console.error("Failed to confirm delivery", error);
+        }
+      },
+    });
   };
 
   const renderStatusBanner = () => {
-    if (
-      escrow.status === "pending_seller_agreement" ||
-      escrow.status === "pending_buyer_confirmation" ||
-      escrow.status === "locked"
-    ) {
+    if (escrow.status === "pending_seller_agreement") {
       return (
         <View className="bg-[#2D3018] rounded-[20px] p-5 flex-row items-center">
           <View className="w-12 h-12 bg-[#161B22] rounded-xl items-center justify-center mr-4">
@@ -302,14 +285,67 @@ export default function EscrowDetailScreen() {
               style={{ fontFamily: "Inter-Bold" }}
               className="text-[#F5E642] text-base"
             >
-              Awaiting Seller Confirmation
+              {isSeller ? "Review Buyer Terms" : "Awaiting Seller Terms"}
             </Typography>
             <Typography
               style={{ fontFamily: "Inter" }}
               className="text-[#8B949E] text-xs mt-1"
             >
-              You have confirmed the terms. We're waiting for the seller to
-              verify and start fulfillment.
+              {isSeller
+                ? "Please review the buyer's proposal and add your own terms to proceed."
+                : "The seller needs to review your proposal and add their terms."}
+            </Typography>
+          </View>
+        </View>
+      );
+    }
+
+    if (escrow.status === "pending_buyer_confirmation") {
+      return (
+        <View className="bg-[#2D3018] rounded-[20px] p-5 flex-row items-center border border-[#F5E642]/20">
+          <View className="w-12 h-12 bg-[#161B22] rounded-xl items-center justify-center mr-4">
+            <ShieldCheck size={24} color="#F5E642" />
+          </View>
+          <View className="flex-1">
+            <Typography
+              style={{ fontFamily: "Inter-Bold" }}
+              className="text-[#F5E642] text-base"
+            >
+              {isBuyer ? "Review Seller Terms" : "Awaiting Buyer Agreement"}
+            </Typography>
+            <Typography
+              style={{ fontFamily: "Inter" }}
+              className="text-[#8B949E] text-xs mt-1"
+            >
+              {isBuyer
+                ? "The seller has added their terms. Please review and agree to lock the escrow."
+                : "Waiting for the buyer to review and agree to the combined terms."}
+            </Typography>
+          </View>
+        </View>
+      );
+    }
+
+    if (escrow.status === "locked") {
+      return (
+        <View className="bg-[#2D3018] rounded-[20px] p-5 flex-row items-center">
+          <View className="w-12 h-12 bg-[#161B22] rounded-xl items-center justify-center mr-4">
+            <Lock size={24} color="#F5E642" />
+          </View>
+          <View className="flex-1">
+            <Typography
+              style={{ fontFamily: "Inter-Bold" }}
+              className="text-[#F5E642] text-base"
+            >
+              Escrow Terms Locked
+            </Typography>
+            <Typography
+              style={{ fontFamily: "Inter" }}
+              className="text-[#8B949E] text-xs mt-1"
+            >
+              {isBuyer
+                ? "Terms are agreed. Please fund the escrow to start the transaction."
+                : "Terms are agreed. Waiting for the buyer to fund the escrow."}
             </Typography>
           </View>
         </View>
@@ -689,16 +725,59 @@ export default function EscrowDetailScreen() {
               <View style={{ padding: 16 }}>
                 <Typography
                   style={{ fontFamily: "Inter-Bold", letterSpacing: 1.5 }}
-                  className="text-[#8B949E] text-[8px] uppercase mb-2"
+                  className="text-[#8B949E] text-[8px] uppercase mb-3"
                 >
-                  DETAILED NOTES
+                  DETAILED TERMS
                 </Typography>
-                <Typography
-                  style={{ fontFamily: "Inter" }}
-                  className="text-[#8B949E] text-xs leading-5"
-                >
-                  {escrow.final_agreement || escrow.buyer_terms}
-                </Typography>
+                
+                <View className="mb-4">
+                  <Typography
+                    style={{ fontFamily: "Inter-Bold", letterSpacing: 1.5 }}
+                    className="text-[#F5E642] text-[8px] uppercase mb-1"
+                  >
+                    BUYER'S PROPOSAL
+                  </Typography>
+                  <Typography
+                    style={{ fontFamily: "Inter" }}
+                    className="text-white text-xs leading-5"
+                  >
+                    {escrow.buyer_terms}
+                  </Typography>
+                </View>
+
+                {escrow.seller_terms ? (
+                  <View className={escrow.final_agreement ? "mb-4" : ""}>
+                    <Typography
+                      style={{ fontFamily: "Inter-Bold", letterSpacing: 1.5 }}
+                      className="text-[#00C896] text-[8px] uppercase mb-1"
+                    >
+                      SELLER'S COUNTER TERMS
+                    </Typography>
+                    <Typography
+                      style={{ fontFamily: "Inter" }}
+                      className="text-white text-xs leading-5"
+                    >
+                      {escrow.seller_terms}
+                    </Typography>
+                  </View>
+                ) : null}
+
+                {escrow.final_agreement ? (
+                  <View className="mt-2 pt-3 border-t border-[#30363D]">
+                    <Typography
+                      style={{ fontFamily: "Inter-Bold", letterSpacing: 1.5 }}
+                      className="text-[#8B949E] text-[8px] uppercase mb-1"
+                    >
+                      FINAL AGREED TERMS
+                    </Typography>
+                    <Typography
+                      style={{ fontFamily: "Inter" }}
+                      className="text-white text-xs leading-5"
+                    >
+                      {escrow.final_agreement}
+                    </Typography>
+                  </View>
+                ) : null}
               </View>
             </View>
           </View>
@@ -755,98 +834,31 @@ export default function EscrowDetailScreen() {
           {/* CONTEXT ACTIONS */}
           <View className="pb-24">
             {escrow.status === "pending_seller_agreement" && isSeller && (
-              <TouchableOpacity
+              <Button
+              textClassName="!text-black !font-inter-bold"
+              variant="primary"
                 onPress={() => setIsSellerTermsModalVisible(true)}
-              >
-                <LinearGradient
-                  colors={["#F5E642", "#D4C200"]}
-                  className="h-14 rounded-[20px] items-center justify-center"
-                >
-                  <Typography
-                    style={{ fontFamily: "Inter-Bold" }}
-                    className="text-[#0D1117] text-base uppercase"
-                  >
-                    ADD YOUR TERMS
-                  </Typography>
-                </LinearGradient>
-              </TouchableOpacity>
+                label="ADD YOUR TERMS"
+              />
             )}
 
             {escrow.status === "pending_buyer_confirmation" && isBuyer && (
-              <TouchableOpacity onPress={handleConfirmAgreement}>
-                <LinearGradient
-                  colors={["#F5E642", "#D4C200"]}
-                  className="h-14 rounded-[20px] items-center justify-center"
-                >
-                  <Typography
-                    style={{ fontFamily: "Inter-Bold" }}
-                    className="text-[#0D1117] text-base uppercase"
-                  >
-                    AGREE & LOCK ESCROW
-                  </Typography>
-                </LinearGradient>
-              </TouchableOpacity>
+              <Button onPress={handleConfirmAgreement} variant="primary" label="AGREE & LOCK ESCROW" textClassName="!text-black !font-inter-bold" />
             )}
 
             {escrow.status === "locked" && isBuyer && escrow.can_be_funded && (
-              <TouchableOpacity onPress={handleFundEscrow}>
-                <LinearGradient
-                  colors={["#F5E642", "#D4C200"]}
-                  className="h-14 rounded-[20px] items-center justify-center"
-                >
-                  <Typography
-                    style={{ fontFamily: "Inter-Bold" }}
-                    className="text-[#0D1117] text-base uppercase"
-                  >
-                    FUND ESCROW
-                  </Typography>
-                </LinearGradient>
-              </TouchableOpacity>
+              <Button variant="primary" label="FUND ESCROW" textClassName="!text-black !font-inter-bold" onPress={handleFundEscrow} />
             )}
 
             {escrow.status === "funded" && isSeller && (
-              <TouchableOpacity onPress={handleMarkDelivered}>
-                <LinearGradient
-                  colors={["#F5E642", "#D4C200"]}
-                  className="h-14 rounded-[20px] items-center justify-center"
-                >
-                  <Typography
-                    style={{ fontFamily: "Inter-Bold" }}
-                    className="text-[#0D1117] text-base uppercase"
-                  >
-                    MARK AS DELIVERED
-                  </Typography>
-                </LinearGradient>
-              </TouchableOpacity>
+              <Button variant="primary" label="MARK AS DELIVERED" textClassName="!text-black !font-inter-bold"  onPress={handleMarkDelivered}>
+              </Button>
             )}
 
             {escrow.status === "awaiting_buyer_release" && isBuyer && (
               <View style={{ gap: 16 }}>
-                <TouchableOpacity onPress={handleConfirmDelivery}>
-                  <LinearGradient
-                    colors={["#F5E642", "#D4C200"]}
-                    className="h-14 rounded-[20px] items-center justify-center"
-                  >
-                    <Typography
-                      style={{ fontFamily: "Inter-Bold" }}
-                      className="text-[#0D1117] text-base uppercase"
-                    >
-                      CONFIRM & RELEASE FUNDS
-                    </Typography>
-                  </LinearGradient>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => router.push(`/escrow/${id}/dispute`)}
-                  className="h-14 rounded-[20px] border border-[#FF4D4F]/30 items-center justify-center flex-row"
-                >
-                  <Gavel size={18} color="#FF4D4F" />
-                  <Typography
-                    style={{ fontFamily: "Inter-Bold" }}
-                    className="text-[#FF4D4F] text-sm ml-2"
-                  >
-                    OPEN DISPUTE
-                  </Typography>
-                </TouchableOpacity>
+                <Button label="CONFIRM & RELEASE FUNDS" textClassName="!text-black !font-inter-bold" variant="primary" onPress={handleConfirmDelivery} />
+                <Button variant="danger" label="OPEN DISPUTE" textClassName="!text-black !font-inter-bold" onPress={() => router.push(`/escrow/${id}/dispute`)} />
               </View>
             )}
           </View>
@@ -887,29 +899,34 @@ export default function EscrowDetailScreen() {
                 </Typography>
               </TouchableOpacity>
             </View>
+
+            <View className="bg-[#0D1117] p-4 rounded-xl mb-4 border border-[#30363D]">
+              <Typography
+                style={{ fontFamily: "Inter-Bold", letterSpacing: 1.5 }}
+                className="text-[#F5E642] text-[8px] uppercase mb-1"
+              >
+                BUYER'S PROPOSAL
+              </Typography>
+              <Typography
+                style={{ fontFamily: "Inter" }}
+                className="text-[#8B949E] text-xs leading-5"
+                numberOfLines={4}
+              >
+                {escrow.buyer_terms}
+              </Typography>
+            </View>
+
             <TextInput
               multiline
-              numberOfLines={8}
-              placeholder="Enter your terms here..."
+              numberOfLines={6}
+              placeholder="Enter your terms or counter-proposal..."
               placeholderTextColor="#484f58"
-              className="bg-[#0D1117] text-white p-4 rounded-xl text-sm h-48"
+              className="bg-[#0D1117] text-white p-4 rounded-xl text-sm flex-1 mb-4"
               style={{ fontFamily: "Inter", textAlignVertical: "top" }}
               value={sellerTerms}
               onChangeText={setSellerTerms}
             />
-            <TouchableOpacity onPress={handleAddSellerTerms} className="mt-6">
-              <LinearGradient
-                colors={["#F5E642", "#D4C200"]}
-                className="h-14 rounded-[20px] items-center justify-center"
-              >
-                <Typography
-                  style={{ fontFamily: "Inter-Bold" }}
-                  className="text-[#0D1117] text-base"
-                >
-                  SUBMIT TERMS
-                </Typography>
-              </LinearGradient>
-            </TouchableOpacity>
+            <Button variant='primary' textClassName="!text-black !font-inter-bold" onPress={handleAddSellerTerms} label="SUBMIT TERMS"/>
           </View>
         </View>
       </Modal>
