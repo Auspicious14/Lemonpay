@@ -54,7 +54,8 @@
       "router": {},
       "eas": {
         "projectId": "fca9e55c-7ece-4873-b6ac-20648c5fcc91"
-      }
+      },
+    "apiUrl": "https://lemon-api.uncutai.io/api"
     },
     "owner": "auspicious14"
   }
