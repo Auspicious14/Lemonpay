@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -17,6 +17,8 @@ import { Toast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { SplashScreen } from "../components/ui/SplashScreen";
+import { notificationService } from "@/services/notifications";
+import { useToastStore } from "@/store/useToastStore";
 import "../styles/global.css";
 
 const queryClient = new QueryClient();
@@ -25,16 +27,17 @@ const queryClient = new QueryClient();
 SplashScreenNative.preventAutoHideAsync();
 
 function AppContent() {
-  const { isLoading, hasPinSetup } = useAuth();
+  const { isLoading } = useAuth();
+  const router = useRouter();
   const [fontsLoaded, fontError] = useFonts({
-    'Inter': Inter_400Regular,
-    'Inter-Medium': Inter_500Medium,
-    'Inter-SemiBold': Inter_600SemiBold,
-    'Inter-Bold': Inter_700Bold,
-    'Inter-ExtraBold': Inter_800ExtraBold,
-    'inter': Inter_400Regular,
-    'inter-medium': Inter_500Medium,
-    'inter-bold': Inter_700Bold,
+    Inter: Inter_400Regular,
+    "Inter-Medium": Inter_500Medium,
+    "Inter-SemiBold": Inter_600SemiBold,
+    "Inter-Bold": Inter_700Bold,
+    "Inter-ExtraBold": Inter_800ExtraBold,
+    inter: Inter_400Regular,
+    "inter-medium": Inter_500Medium,
+    "inter-bold": Inter_700Bold,
   });
 
   useEffect(() => {
@@ -42,6 +45,52 @@ function AppContent() {
       SplashScreenNative.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  // ─── PUSH NOTIFICATION SETUP ─────────────────────────────────────────────
+  useEffect(() => {
+    // Register for push token
+    notificationService.registerForPushNotificationsAsync();
+
+    // Handle deep navigation from notification data
+    const handleNotificationNavigation = (data: Record<string, any>) => {
+      if (!data) return;
+      console.log("[PUSH CLICK]", data);
+      switch (data.type) {
+        case "escrow_counter_received":
+        case "escrow_counter_sent":
+        case "escrow_funded":
+        case "escrow_delivered":
+        case "escrow_released":
+        case "escrow_locked":
+        case "escrow_update":
+          router.push(`/escrow/${data.escrow_uuid}`);
+          break;
+        case "dispute_update":
+          router.push(`/disputes/${data.dispute_uuid}`);
+          break;
+        default:
+          router.push("/(tabs)");
+      }
+    };
+
+    const cleanup = notificationService.setupListeners(
+      (notification) => {
+        const { title, body } = notification.request.content;
+        console.log("[PUSH RECEIVED]", title, body);
+        useToastStore.getState().show(body || title || "", "info");
+      },
+      (response) => {
+        const data = response.notification.request.content.data as Record<
+          string,
+          any
+        >;
+        handleNotificationNavigation(data);
+      },
+    );
+
+    return cleanup;
+  }, [router]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (!fontsLoaded && !fontError) {
     console.log("[LAYOUT] Waiting for fonts...");
@@ -70,6 +119,7 @@ function AppContent() {
       <Stack.Screen name="profile-setup" options={{ presentation: "modal" }} />
       <Stack.Screen name="escrow" options={{ presentation: "card" }} />
       <Stack.Screen name="wallet" options={{ presentation: "card" }} />
+      <Stack.Screen name="notifications" options={{ presentation: "card" }} />
     </Stack>
   );
 }

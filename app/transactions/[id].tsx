@@ -2,14 +2,9 @@ import React from "react";
 import { View, ScrollView, TouchableOpacity, Share } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  ArrowLeft,
   Share2,
   HelpCircle,
   Download,
-  ChevronRight,
-  ShieldCheck,
-  TrendingUp,
-  Receipt,
   FileText,
   AlertTriangle,
 } from "lucide-react-native";
@@ -17,10 +12,12 @@ import { Screen } from "@/components/ui/Screen";
 import { Typography } from "@/components/ui/Typography";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useToastStore } from "@/store/useToastStore";
 
 export default function TransactionDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const showToast = useToastStore((state) => state.show);
 
   const handleShare = async () => {
     try {
@@ -30,6 +27,11 @@ export default function TransactionDetailScreen() {
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const handleRaiseDispute = () => {
+    router.push("/(tabs)/escrows");
+    showToast("Select the escrow to raise a dispute", "info");
   };
 
   return (
@@ -215,7 +217,10 @@ export default function TransactionDetailScreen() {
             </Card>
 
             {/* Support Section */}
-            <TouchableOpacity className="p-6 bg-surface-container-high/40 rounded-3xl flex-row items-center justify-between border border-outline-variant/10 active:scale-95 transition-all">
+            <TouchableOpacity
+              onPress={handleRaiseDispute}
+              className="p-6 bg-surface-container-high/40 rounded-3xl flex-row items-center justify-between border border-outline-variant/10 active:scale-95 transition-all"
+            >
               <View className="flex-row items-center space-x-4">
                 <View className="w-10 h-10 rounded-xl bg-surface-bright items-center justify-center">
                   <HelpCircle size={18} color="#d8ca23" />

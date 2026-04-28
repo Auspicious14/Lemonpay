@@ -8,6 +8,7 @@ export const getEscrowStepIndex = (status: EscrowStatus): number => {
     case "pending_seller_agreement":
       return 0;
     case "pending_buyer_confirmation":
+    case "pending_seller_confirmation":
     case "locked":
       return 1;
     case "funded":
@@ -30,7 +31,7 @@ export const getEscrowStepIndex = (status: EscrowStatus): number => {
  */
 export const getUserRole = (
   escrow: Escrow,
-  userId: string
+  userId: string,
 ): "buyer" | "seller" | null => {
   if (escrow.buyer_id === userId) return "buyer";
   if (escrow.seller_id === userId) return "seller";
@@ -42,7 +43,7 @@ export const getUserRole = (
  */
 export const getActionableStatus = (
   escrow: Escrow,
-  userId: string
+  userId: string,
 ): string | null => {
   const role = getUserRole(escrow, userId);
   const { status } = escrow;
@@ -74,6 +75,8 @@ export const getActionableStatus = (
         return "Awaiting seller to add terms";
       case "pending_buyer_confirmation":
         return "Seller has added terms. Please review and agree";
+      case "pending_seller_confirmation":
+        return "Buyer sent a counter. Waiting for seller response";
       case "locked":
         return "Terms agreed. Please fund the escrow";
       case "funded":
@@ -101,6 +104,8 @@ export const getStatusBadgeInfo = (status: EscrowStatus) => {
       return { label: "AWAITING SELLER", color: "amber" };
     case "pending_buyer_confirmation":
       return { label: "REVIEW NEEDED", color: "blue" };
+    case "pending_seller_confirmation":
+      return { label: "SELLER REVIEW", color: "blue" };
     case "locked":
       return { label: "AGREED", color: "purple" };
     case "funded":

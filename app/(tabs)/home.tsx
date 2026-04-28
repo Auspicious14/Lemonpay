@@ -11,7 +11,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import {
   Wallet,
-  Bell,
   ShieldCheck,
   Lock,
   Plus,
@@ -33,6 +32,7 @@ import {
 } from "@/components/ui/TransactionRow";
 import { EscrowProgressBar } from "@/components/ui/EscrowProgressBar";
 import { Avatar } from "@/components/ui/Avatar";
+import { NotificationBell } from "@/components/ui/NotificationBell";
 import { LinearGradient } from "expo-linear-gradient";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { getStatusBadgeInfo } from "@/lib/utils/escrow";
@@ -97,7 +97,11 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refetchBalance(), refetchEscrows(), refetchTransactions()]);
+    await Promise.all([
+      refetchBalance(),
+      refetchEscrows(),
+      refetchTransactions(),
+    ]);
     setRefreshing(false);
   }, [refetchBalance, refetchEscrows, refetchTransactions]);
 
@@ -105,24 +109,41 @@ export default function HomeScreen() {
   useRefreshOnFocus(refetchEscrows);
   useRefreshOnFocus(refetchTransactions);
 
-  const activeEscrows = (escrowsData?.data || []).filter(e => 
-    ['pending_seller_agreement', 'pending_buyer_confirmation', 
-     'locked', 'funded', 'awaiting_buyer_release'].includes(e.status)
+  const activeEscrows = (escrowsData?.data || []).filter((e) =>
+    [
+      "pending_seller_agreement",
+      "pending_buyer_confirmation",
+      "locked",
+      "funded",
+      "awaiting_buyer_release",
+    ].includes(e.status),
   );
-  
+
   const recentTransactions = (transactionsData?.data || []).slice(0, 5);
 
   const getStatusInfo = (status: any) => {
     const info = getStatusBadgeInfo(status);
     let colorClass = "bg-[#30363D]";
-    
+
     switch (info.color) {
-      case "amber": colorClass = "bg-[#F5E642]"; break;
-      case "blue": colorClass = "bg-blue-500"; break;
-      case "purple": colorClass = "bg-purple-500"; break;
-      case "yellow": colorClass = "bg-yellow-500"; break;
-      case "teal": colorClass = "bg-[#00C896]"; break;
-      case "red": colorClass = "bg-[#FF4D4F]"; break;
+      case "amber":
+        colorClass = "bg-[#F5E642]";
+        break;
+      case "blue":
+        colorClass = "bg-blue-500";
+        break;
+      case "purple":
+        colorClass = "bg-purple-500";
+        break;
+      case "yellow":
+        colorClass = "bg-yellow-500";
+        break;
+      case "teal":
+        colorClass = "bg-[#00C896]";
+        break;
+      case "red":
+        colorClass = "bg-[#FF4D4F]";
+        break;
     }
 
     return { label: info.label, color: colorClass };
@@ -136,27 +157,22 @@ export default function HomeScreen() {
       <View className="px-6 py-4 flex-row justify-between items-center bg-[#0D1117]">
         <View className="flex-row items-center">
           <View className="w-8 h-8 rounded-full bg-accent-primary items-center justify-center mr-2">
-            <Text 
-              style={{ fontFamily: 'Inter-Bold' }}
+            <Text
+              style={{ fontFamily: "Inter-Bold" }}
               className="text-[#0D1117] text-lg"
             >
               {user?.first_name?.charAt(0) || "L"}
             </Text>
           </View>
-          <Text 
-              style={{ fontFamily: 'Inter-Bold' }}
-              className="text-white text-xl"
-            >
-              LymePay
-            </Text>
+          <Text
+            style={{ fontFamily: "Inter-Bold" }}
+            className="text-white text-xl"
+          >
+            LymePay
+          </Text>
         </View>
         <View className="flex-row items-center gap-x-4">
-          <TouchableOpacity 
-            className="w-10 h-10 items-center justify-center"
-            onPress={() => router.push("/notifications")}
-          >
-            <Bell size={24} color="white" />
-          </TouchableOpacity>
+          <NotificationBell color="white" size={24} />
           <Avatar
             name={`${user?.first_name} ${user?.last_name}`}
             size="sm"
@@ -180,8 +196,8 @@ export default function HomeScreen() {
         <View className="bg-[#161B22] rounded-xl p-5 mt-4">
           <View className="flex-row items-center mb-2">
             <Wallet size={12} color="#8B949E" />
-            <Text 
-              style={{ fontFamily: 'Inter-Bold' }}
+            <Text
+              style={{ fontFamily: "Inter-Bold" }}
               className="text-[#8B949E] text-[10px] ml-2 tracking-widest uppercase"
             >
               TOTAL WALLET BALANCE
@@ -191,8 +207,8 @@ export default function HomeScreen() {
           {isBalanceLoading ? (
             <BalanceSkeleton />
           ) : (
-            <Text 
-              style={{ fontFamily: 'Inter-ExtraBold' }}
+            <Text
+              style={{ fontFamily: "Inter-ExtraBold" }}
               className="text-white text-4xl mb-1"
             >
               {formatCurrency(balance?.balance || 0)}
@@ -201,8 +217,8 @@ export default function HomeScreen() {
 
           <View className="flex-row items-center mb-6">
             <TrendingUp size={14} color="#00C896" />
-            <Text 
-              style={{ fontFamily: 'Inter-Medium' }}
+            <Text
+              style={{ fontFamily: "Inter-Medium" }}
               className="text-[#00C896] text-xs ml-1"
             >
               +2.4% this month
@@ -219,8 +235,8 @@ export default function HomeScreen() {
                 className="flex-1 flex-row items-center justify-center"
               >
                 <Plus size={18} color="#0D1117" />
-                <Text 
-                  style={{ fontFamily: 'Inter-Bold' }}
+                <Text
+                  style={{ fontFamily: "Inter-Bold" }}
                   className="text-[#0D1117] text-sm ml-2"
                 >
                   Fund Wallet
@@ -228,13 +244,13 @@ export default function HomeScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               className="flex-1 h-12 rounded-full bg-[#21262D] border border-[#30363D] flex-row items-center justify-center"
               onPress={() => router.push("/wallet/withdraw")}
             >
               <Upload size={18} color="white" />
-              <Text 
-                style={{ fontFamily: 'Inter-Bold' }}
+              <Text
+                style={{ fontFamily: "Inter-Bold" }}
                 className="text-white text-sm ml-2"
               >
                 Withdraw
@@ -248,23 +264,23 @@ export default function HomeScreen() {
           <View className="flex-1">
             <View className="flex-row items-center mb-1">
               <ShieldCheck size={20} color="#00C896" />
-              <Text 
-                style={{ fontFamily: 'Inter-Medium' }}
+              <Text
+                style={{ fontFamily: "Inter-Medium" }}
                 className="text-[#8B949E] text-xs ml-2"
               >
                 Escrow Success Rate
               </Text>
             </View>
-            <Text 
-              style={{ fontFamily: 'Inter-Bold' }}
+            <Text
+              style={{ fontFamily: "Inter-Bold" }}
               className="text-white text-2xl"
             >
               99.8%
             </Text>
             <View className="flex-row items-center mt-2">
               <Lock size={12} color="#8B949E" />
-              <Text 
-                style={{ fontFamily: 'Inter' }}
+              <Text
+                style={{ fontFamily: "Inter" }}
                 className="text-[#8B949E] text-[10px] ml-1 uppercase"
               >
                 Secure by LymePay Guard
@@ -272,8 +288,8 @@ export default function HomeScreen() {
             </View>
           </View>
           <View className="bg-[#00C896]/20 px-3 py-1 rounded-full">
-            <Text 
-              style={{ fontFamily: 'Inter-Bold' }}
+            <Text
+              style={{ fontFamily: "Inter-Bold" }}
               className="text-[#00C896] text-[10px] tracking-widest uppercase"
             >
               GOLD TIER
@@ -300,8 +316,8 @@ export default function HomeScreen() {
             {isEscrowsLoading ? (
               <View className="flex-row gap-x-3">
                 {[1, 2].map((i) => (
-                  <View 
-                    key={i} 
+                  <View
+                    key={i}
                     className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 mr-3"
                     style={{ width: width - 48, height: 180 }}
                   />
@@ -322,8 +338,8 @@ export default function HomeScreen() {
                         <ShoppingBag size={20} color="white" />
                       </View>
                       <View className={`${statusInfo.color} px-2 py-1 rounded`}>
-                        <Text 
-                          style={{ fontFamily: 'Inter-Bold' }}
+                        <Text
+                          style={{ fontFamily: "Inter-Bold" }}
                           className="text-[#0D1117] text-[8px] tracking-widest uppercase"
                         >
                           {statusInfo.label}
@@ -332,24 +348,27 @@ export default function HomeScreen() {
                     </View>
 
                     <Text
-                      style={{ fontFamily: 'Inter-Bold' }}
+                      style={{ fontFamily: "Inter-Bold" }}
                       className="text-white text-lg"
                       numberOfLines={1}
                     >
                       {escrow.title}
                     </Text>
-                    <Text 
-                      style={{ fontFamily: 'Inter' }}
+                    <Text
+                      style={{ fontFamily: "Inter" }}
                       className="text-[#8B949E] text-sm mb-4"
                     >
-                      @{escrow.seller?.first_name || escrow.seller_identifier || "Merchant"}
+                      @
+                      {escrow.seller?.first_name ||
+                        escrow.seller_identifier ||
+                        "Merchant"}
                     </Text>
 
                     <EscrowProgressBar status={escrow.status} />
 
                     <View className="flex-row justify-between items-center mt-6">
-                      <Text 
-                        style={{ fontFamily: 'Inter-Bold' }}
+                      <Text
+                        style={{ fontFamily: "Inter-Bold" }}
                         className="text-white text-xl"
                       >
                         {formatCurrency(escrow.amount)}
@@ -366,13 +385,22 @@ export default function HomeScreen() {
                 style={{ width: width - 80, height: 180 }}
               >
                 <Plus size={32} color="#30363D" />
-                <Text 
-                  style={{ fontFamily: 'Inter-Bold', color: 'white', marginTop: 12 }}
+                <Text
+                  style={{
+                    fontFamily: "Inter-Bold",
+                    color: "white",
+                    marginTop: 12,
+                  }}
                 >
                   Create New Escrow
                 </Text>
-                <Text 
-                  style={{ fontFamily: 'Inter', color: '#8B949E', fontSize: 12, marginTop: 4 }}
+                <Text
+                  style={{
+                    fontFamily: "Inter",
+                    color: "#8B949E",
+                    fontSize: 12,
+                    marginTop: 4,
+                  }}
                 >
                   No active escrows found
                 </Text>
@@ -383,36 +411,42 @@ export default function HomeScreen() {
 
         {/* RECENT TRANSACTIONS SECTION */}
         <View className="mt-8 mb-24">
-          <View style={{ 
-            flexDirection: 'row', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            marginBottom: 16, 
-          }}> 
-            <Text style={{ 
-              fontFamily: 'Inter-Bold', 
-              color: 'white', 
-              fontSize: 20 
-            }}> 
-              Recent Transactions 
-            </Text> 
-            <TouchableOpacity 
-              onPress={() => router.push('/wallet/transactions')} 
-            > 
-              <Text style={{ 
-                fontFamily: 'Inter-Bold', 
-                color: '#F5E642', 
-                fontSize: 13 
-              }}> 
-                View All → 
-              </Text> 
-            </TouchableOpacity> 
-          </View> 
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 16,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Inter-Bold",
+                color: "white",
+                fontSize: 20,
+              }}
+            >
+              Recent Transactions
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/wallet/transactions")}
+            >
+              <Text
+                style={{
+                  fontFamily: "Inter-Bold",
+                  color: "#F5E642",
+                  fontSize: 13,
+                }}
+              >
+                View All →
+              </Text>
+            </TouchableOpacity>
+          </View>
           <View className="bg-[#161B22] rounded-xl px-5">
             {isTransactionsLoading ? (
               <View className="py-10 items-center">
-                <Text 
-                  style={{ fontFamily: 'Inter' }}
+                <Text
+                  style={{ fontFamily: "Inter" }}
                   className="text-[#8B949E]"
                 >
                   Loading...
@@ -421,9 +455,10 @@ export default function HomeScreen() {
             ) : recentTransactions.length > 0 ? (
               recentTransactions.map((tx, index) => {
                 const isCredit = tx.type === "credit";
-                
+
                 let type: TransactionType = "funded";
-                if (tx.description.includes("Escrow released")) type = "released";
+                if (tx.description.includes("Escrow released"))
+                  type = "released";
                 if (tx.description.includes("Withdrawal")) type = "disputed"; // Red color
                 if (tx.description.includes("Wallet fund")) type = "funded"; // Yellow color
 
@@ -436,7 +471,13 @@ export default function HomeScreen() {
                       amount={parseFloat(tx.amount)}
                       isCredit={isCredit}
                       status={tx.status.toUpperCase()}
-                      statusColor={tx.status === "completed" ? "success" : tx.status === "pending" ? "pending" : "danger"}
+                      statusColor={
+                        tx.status === "completed"
+                          ? "success"
+                          : tx.status === "pending"
+                            ? "pending"
+                            : "danger"
+                      }
                     />
                     {index < recentTransactions.length - 1 && (
                       <View className="h-[1px] bg-[#30363D]" />
@@ -446,8 +487,8 @@ export default function HomeScreen() {
               })
             ) : (
               <View className="py-10 items-center">
-                <Text 
-                  style={{ fontFamily: 'Inter' }}
+                <Text
+                  style={{ fontFamily: "Inter" }}
                   className="text-[#8B949E]"
                 >
                   No transactions yet
@@ -465,8 +506,8 @@ export default function HomeScreen() {
       >
         <View className="flex-row items-center border-t border-[#30363D] w-full justify-center pt-3">
           <ShieldCheck size={12} color="#8B949E" />
-          <Text 
-            style={{ fontFamily: 'Inter-Bold' }}
+          <Text
+            style={{ fontFamily: "Inter-Bold" }}
             className="text-[#8B949E] text-[8px] ml-1 tracking-widest uppercase"
           >
             SECURE BY LYMEPAY GUARD V2.4

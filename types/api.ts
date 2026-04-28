@@ -106,6 +106,7 @@ export interface EscrowParticipant {
 export type EscrowStatus =
   | "pending_seller_agreement"
   | "pending_buyer_confirmation"
+  | "pending_seller_confirmation"
   | "locked"
   | "funded"
   | "awaiting_buyer_release"

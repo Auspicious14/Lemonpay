@@ -10,6 +10,7 @@ export const ENDPOINTS = {
   },
   USER: {
     SET_PIN: "/user/pin",
+    PUSH_TOKEN: "/user/push-token",
   },
   WALLET: {
     BALANCE: "/wallet/balance",
@@ -30,6 +31,7 @@ export const ENDPOINTS = {
     DETAIL: (id: string | number) => `/escrow/${id}`,
     CREATE: "/escrow/",
     SELLER_AGREE: (id: string | number) => `/escrow/${id}/seller-agreement`,
+    BUYER_COUNTER: (id: string | number) => `/escrow/${id}/buyer-counter`,
     CONFIRM_AGREE: (id: string | number) => `/escrow/${id}/confirm-agreement`,
     FUND: (id: string | number) => `/escrow/${id}/fund`,
     DELIVER: (id: string | number) => `/escrow/${id}/mark-delivered`,
