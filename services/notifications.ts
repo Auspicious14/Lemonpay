@@ -1,27 +1,59 @@
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { apiClient } from "@/lib/api/client";
 import { ENDPOINTS } from "@/lib/api/endpoints";
 
-// Configure how notifications are presented when the app is in foreground
+const PROJECT_ID = "fca9e55c-7ece-4873-b6ac-20648c5fcc91";
+
+// ─── Foreground notification handler ─────────────────────────────────────────
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (): Promise<Notifications.NotificationBehavior> => {
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
 });
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** True when running inside Expo Go (where push is removed in SDK 53+) */
+const isExpoGo = (): boolean => (Constants as any).appOwnership === "expo";
+
+/** True only on a real physical device */
+const isPhysicalDevice = (): boolean => !!Device.isDevice;
+
+// ─── Service ─────────────────────────────────────────────────────────────────
 export const notificationService = {
   /**
-   * Request permissions and register the device for push notifications.
-   * On success, sends the Expo push token to the backend.
+   * Request permission and register the Expo push token with the backend.
+   * - Skips in Expo Go (SDK 53 removed remote push from Expo Go)
+   * - Skips on simulators / emulators
    */
   registerForPushNotificationsAsync: async (): Promise<string | null> => {
-    if (!Device.isDevice) {
+    if (isExpoGo()) {
+      console.log("[PUSH] Skipped — Expo Go does not support push in SDK 53+");
+      return null;
+    }
+
+    if (!isPhysicalDevice()) {
       console.log("[PUSH] Skipped — not a physical device");
       return null;
+    }
+
+    // Android: ensure a notification channel exists
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "LymePay Notifications",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#F5E642",
+      });
     }
 
     const { status: existingStatus } =
@@ -34,17 +66,24 @@ export const notificationService = {
     }
 
     if (finalStatus !== "granted") {
-      console.log("[PUSH] Permission not granted");
+      console.log("[PUSH] Permission not granted — status:", finalStatus);
       return null;
     }
 
-    const projectId = (Constants.expoConfig?.extra as any)?.eas?.projectId as
-      | string
-      | undefined;
+    // Resolve projectId: prefer runtime config, fall back to hardcoded
+    const projectId: string =
+      (Constants.expoConfig?.extra as any)?.eas?.projectId ?? PROJECT_ID;
 
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId }))
-      .data;
-    console.log("[PUSH TOKEN]", token);
+    console.log("[PUSH] Using projectId:", projectId);
+
+    let token: string;
+    try {
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      console.log("[PUSH TOKEN]", token);
+    } catch (e) {
+      console.log("[PUSH TOKEN GET FAILED]", e);
+      return null;
+    }
 
     try {
       await apiClient.post(ENDPOINTS.USER.PUSH_TOKEN, { token });
@@ -58,7 +97,7 @@ export const notificationService = {
 
   /**
    * Register foreground + tap listeners.
-   * Returns a cleanup function to be called on unmount.
+   * Returns a cleanup function — call it in useEffect's return.
    */
   setupListeners: (
     onReceive: (n: Notifications.Notification) => void,
@@ -74,7 +113,8 @@ export const notificationService = {
   },
 
   /**
-   * Fire an immediate local notification (trigger: null = instant).
+   * Fire an immediate local notification (works in Expo Go too).
+   * trigger: null = fire instantly.
    */
   scheduleLocal: async (
     title: string,
@@ -86,7 +126,7 @@ export const notificationService = {
         content: { title, body, data },
         trigger: null,
       });
-      console.log("[LOCAL NOTIF]", title, body, data);
+      console.log("[LOCAL NOTIF]", title, "|", body, "|", data);
     } catch (e) {
       console.log("[LOCAL NOTIF FAILED]", e);
     }
