@@ -5,12 +5,12 @@
     "scheme": "lymepay",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/lymepay-icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
+      "image": "./assets/lymepay-icon.png",
+      "resizeMode": "cover",
       "backgroundColor": "#0D1117"
     },
     "ios": {
@@ -23,7 +23,7 @@
     "android": {
       "package": "com.auspicious14.lymepay",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/lymepay-icon.png",
         "backgroundColor": "#0D1117"
       },
       "permissions": [
@@ -35,16 +35,24 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/lymepay-icon.png"
     },
     "plugins": [
       "expo-router",
       "expo-font",
       "expo-secure-store",
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/lymepay-icon.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#F5E642"
+        }
+      ],
+      [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/lymepay-icon.png",
           "color": "#F5E642",
           "sounds": []
         }
@@ -55,7 +63,7 @@
       "eas": {
         "projectId": "fca9e55c-7ece-4873-b6ac-20648c5fcc91"
       },
-    "apiUrl": "https://lemon-api.uncutai.io/api"
+      "apiUrl": "https://lemon-api.uncutai.io/api"
     },
     "owner": "auspicious14"
   }
