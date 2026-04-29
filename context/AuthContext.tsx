@@ -48,11 +48,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 let queryClientRef: QueryClient | null = null;
 let backgroundValidationTimer: ReturnType<typeof setTimeout> | null = null;
 
-// This function runs silently after the app loads.
-// When /auth/me doesn't exist (404) → does nothing.
-// When /auth/me exists → validates token + refreshes user data.
-// When /auth/me returns 401 → triggers logout.
-// Activates automatically with zero code changes needed.
 const validateSessionInBackground = (
   token: string,
   currentUser: object | null,
