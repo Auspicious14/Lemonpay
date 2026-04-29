@@ -64,7 +64,7 @@ const validateSessionInBackground = (
   backgroundValidationTimer = setTimeout(async () => {
   try {
     console.log('[SESSION-BG] Attempting /auth/me...')
-    const response = await apiClient.post('/auth/me')
+    const response = await apiClient.get('/auth/me')
     
     const freshUser =
       response.data?.data?.user ??
