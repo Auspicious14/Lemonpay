@@ -1,8 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { TokenStorage } from "../storage";
 import { appEvents } from "./event-emitter";
+import Constants from "expo-constants";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
+const API_URL = process.env.EXPO_PUBLIC_API_URL  ||  Constants.expoConfig?.extra?.apiUrl   
 
 export const apiClient = axios.create({
   baseURL: API_URL,

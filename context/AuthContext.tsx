@@ -61,64 +61,53 @@ const validateSessionInBackground = (
   if (backgroundValidationTimer) {
     clearTimeout(backgroundValidationTimer);
   }
-
   backgroundValidationTimer = setTimeout(async () => {
-    try {
-      console.log("[SESSION-BG] Attempting /auth/me...");
+  try {
+    console.log('[SESSION-BG] Attempting /auth/me...')
+    const response = await apiClient.post('/auth/me')
+    
+    const freshUser =
+      response.data?.data?.user ??
+      response.data?.data ??
+      response.data
 
-      const response = await apiClient.post("/auth/me");
-      const freshUser = response.data?.data ?? response.data;
-
-      if (freshUser && freshUser.id) {
-        console.log("[SESSION-BG] /auth/me success — refreshing user data");
-        await TokenStorage.saveUser(freshUser);
-
-        // Update React Query cache with fresh data
-        // The component re-renders automatically
-        queryClientRef?.setQueryData(["user-session"], freshUser);
-
-        console.log("[SESSION-BG] User data refreshed from server");
-      }
-    } catch (error: any) {
-      const status = error.response?.status;
-
-      if (status === 404) {
-        // Endpoint not ready yet — completely normal
-        // Do nothing, keep stored user
-        console.log(
-          "[SESSION-BG] /auth/me not found (404) — using stored user",
-        );
-        return;
-      }
-
-      if (status === 401) {
-        // Token is invalid or expired
-        console.log("[SESSION-BG] /auth/me 401 — token expired, logging out");
-        await TokenStorage.clearTokens();
-        queryClientRef?.setQueryData(["user-session"], null);
-        queryClientRef?.clear();
-        // Emit session expired event
-        appEvents.emit("session-expired");
-        return;
-      }
-
-      if (status === 403) {
-        console.log("[SESSION-BG] /auth/me 403 — forbidden, logging out");
-        await TokenStorage.clearTokens();
-        queryClientRef?.setQueryData(["user-session"], null);
-        appEvents.emit("session-expired");
-        return;
-      }
-
-      // Network error, timeout, 500 etc.
-      // Keep user logged in — not their fault
-      console.log(
-        "[SESSION-BG] /auth/me error (keeping session):",
-        error.message,
-      );
+    if (!freshUser?.id) {
+      console.log('[SESSION-BG] /auth/me returned no valid user object, skipping')
+      return
     }
-  }, 2000); // 2 second delay — let the app finish loading first
-};
+
+    console.log('[SESSION-BG] /auth/me success:', freshUser.email)
+    await TokenStorage.saveUser(freshUser)
+    queryClientRef?.setQueryData(['user-session'], freshUser)
+    console.log('[SESSION-BG] User data refreshed from server')
+
+  } catch (error: any) {
+    const status = error.response?.status
+
+    if (status === 404) {
+      console.log('[SESSION-BG] /auth/me 404 — endpoint not ready, keeping stored user')
+      return  // graceful, no crash, no logout
+    }
+    if (status === 401) {
+      console.log('[SESSION-BG] /auth/me 401 — token expired, logging out')
+      await TokenStorage.clearTokens()
+      queryClientRef?.setQueryData(['user-session'], null)
+      queryClientRef?.clear()
+      appEvents.emit('session-expired')
+      return
+    }
+    if (status === 403) {
+      console.log('[SESSION-BG] /auth/me 403 — forbidden, logging out')
+      await TokenStorage.clearTokens()
+      queryClientRef?.setQueryData(['user-session'], null)
+      appEvents.emit('session-expired')
+      return
+    }
+    // Network error, 500, timeout — keep session, don't crash
+    console.log('[SESSION-BG] /auth/me non-auth error, keeping session:', error.message)
+  }
+}, 2000)
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [hasLaunched, setHasLaunched] = useState<boolean | null>(null);
