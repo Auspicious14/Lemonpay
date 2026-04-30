@@ -1164,7 +1164,7 @@ export default function CreateEscrowScreen() {
               <TouchableOpacity 
                 onPress={() => {
                   setIsSuccessModalVisible(false);
-                  router.replace("/(tabs)");
+                  router.replace("/home");
                 }}
                 style={{ paddingVertical: 8 }}
               >
