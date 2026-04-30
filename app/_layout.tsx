@@ -17,7 +17,7 @@ import { Toast } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { SplashScreen } from "../components/ui/SplashScreen";
-import { notificationService } from "@/services/notifications";
+// import { notificationService } from "@/services/notifications";
 import { useToastStore } from "@/store/useToastStore";
 import "../styles/global.css";
 
@@ -47,50 +47,49 @@ function AppContent() {
   }, [fontsLoaded, fontError]);
 
   // ─── PUSH NOTIFICATION SETUP ─────────────────────────────────────────────
-  useEffect(() => {
+  // useEffect(() => {
     // Register for push token
-    notificationService.registerForPushNotificationsAsync();
+    // notificationService.registerForPushNotificationsAsync();
 
     // Handle deep navigation from notification data
-    const handleNotificationNavigation = (data: Record<string, any>) => {
-      if (!data) return;
-      console.log("[PUSH CLICK]", data);
-      switch (data.type) {
-        case "escrow_counter_received":
-        case "escrow_counter_sent":
-        case "escrow_funded":
-        case "escrow_delivered":
-        case "escrow_released":
-        case "escrow_locked":
-        case "escrow_update":
-          router.push(`/escrow/${data.escrow_uuid}`);
-          break;
-        case "dispute_update":
-          router.push(`/disputes/${data.dispute_uuid}`);
-          break;
-        default:
-          router.push("/(tabs)");
-      }
-    };
+    // const handleNotificationNavigation = (data: Record<string, any>) => {
+      // if (!data) return;
+      // console.log("[PUSH CLICK]", data);
+      // switch (data.type) {
+        // case "escrow_counter_received":
+        // case "escrow_counter_sent":
+        // case "escrow_funded":
+        // case "escrow_delivered":
+        // case "escrow_released":
+        // case "escrow_locked":
+        // case "escrow_update":
+          // router.push(`/escrow/${data.escrow_uuid}`);
+          // break;
+        // case "dispute_update":
+          // router.push(`/disputes/${data.dispute_uuid}`);
+          // break;
+        // default:
+          // router.push("/(tabs)");
+      // }
+    // };
 
-    const cleanup = notificationService.setupListeners(
-      (notification) => {
-        const { title, body } = notification.request.content;
-        console.log("[PUSH RECEIVED]", title, body);
-        useToastStore.getState().show(body || title || "", "info");
-      },
-      (response) => {
-        const data = response.notification.request.content.data as Record<
-          string,
-          any
-        >;
-        handleNotificationNavigation(data);
-      },
-    );
+    // const cleanup = notificationService.setupListeners(
+      // (notification) => {
+        // const { title, body } = notification.request.content;
+        // console.log("[PUSH RECEIVED]", title, body);
+        // useToastStore.getState().show(body || title || "", "info");
+      // },
+      // (response) => {
+        // const data = response.notification.request.content.data as Record<
+          // string,
+          // any
+        // >;
+        // handleNotificationNavigation(data);
+      // },
+    // );
 
-    return cleanup;
-  }, [router]);
-  // ─────────────────────────────────────────────────────────────────────────
+    // return cleanup;
+  // }, [router]);
 
   if (!fontsLoaded && !fontError) {
     console.log("[LAYOUT] Waiting for fonts...");

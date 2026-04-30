@@ -107,6 +107,7 @@ export type EscrowStatus =
   | "pending_seller_agreement"
   | "pending_buyer_confirmation"
   | "pending_seller_confirmation"
+  | "awaiting_seller_confirmation"
   | "locked"
   | "funded"
   | "awaiting_buyer_release"
@@ -148,6 +149,7 @@ export interface Escrow {
   days_remaining_for_confirmation: number;
   buyer: EscrowParticipant;
   seller: EscrowParticipant;
+  is_negotiating: boolean;
 }
 
 // Disputes

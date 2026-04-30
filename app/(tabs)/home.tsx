@@ -113,9 +113,16 @@ export default function HomeScreen() {
     [
       "pending_seller_agreement",
       "pending_buyer_confirmation",
+      "pending_seller_confirmation",
+      "awaiting_seller_confirmation",
       "locked",
       "funded",
       "awaiting_buyer_release",
+      "delivered",
+      "locked",
+      "funded",
+      "awaiting_buyer_release",
+      "disputed",
     ].includes(e.status),
   );
 

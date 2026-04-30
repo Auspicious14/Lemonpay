@@ -1,7 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
-import api from "../api";
+// import api from "../api";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useToastStore } from "../../store/useToastStore";
+import apiClient from "../api/client";
 
 export const useAuth = () => {
   const { login: setLogin, logout: setLogout } = useAuthStore();
@@ -9,7 +10,7 @@ export const useAuth = () => {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: any) => {
-      const response = await api.post("/auth/login", credentials);
+      const response = await apiClient.post("/auth/login", credentials);
       return response.data;
     },
     onSuccess: (data) => {
@@ -23,7 +24,7 @@ export const useAuth = () => {
 
   const registerMutation = useMutation({
     mutationFn: async (userData: any) => {
-      const response = await api.post("/auth/register", userData);
+      const response = await apiClient.post("/auth/register", userData);
       return response.data;
     },
     onSuccess: () => {
