@@ -23,14 +23,16 @@ import { useWalletBalance } from "@/lib/hooks/useWallet";
 import { useTransactions } from "@/lib/hooks/useTransactions";
 import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import {
-  TransactionRow,
-  TransactionType,
-} from "@/components/ui/TransactionRow";
+import { TransactionRow } from "@/components/ui/TransactionRow";
 import { Avatar } from "@/components/ui/Avatar";
 import { LinearGradient } from "expo-linear-gradient";
 import { useToastStore } from "@/store/useToastStore";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
+import {
+  getTxType,
+  getTxDisplayTitle,
+  getTxSubtitle,
+} from "@/lib/utils/transactions";
 
 export default function WalletScreen() {
   const router = useRouter();
@@ -179,34 +181,22 @@ export default function WalletScreen() {
             </Text>
           </View>
         ) : transactions.length > 0 ? (
-          transactions.map((tx) => {
-            const isCredit = tx.type === "credit";
-
-            let type: TransactionType = "funded";
-            if (tx.description.includes("Escrow released")) type = "released";
-            if (tx.description.includes("Withdrawal")) type = "disputed";
-            if (tx.description.includes("Wallet fund")) type = "funded";
-            console.log(tx.description, type);
-            return (
-              <View key={tx.id} className="bg-[#161B22] rounded-lg p-4 mb-2">
-                <TransactionRow
-                  type={type}
-                  title={tx.description}
-                  subtitle={`${tx.reference.substring(0, 8)} • ${formatDate(tx.created_at)}`}
-                  amount={parseFloat(tx.amount)}
-                  isCredit={isCredit}
-                  status={tx.status.toUpperCase()}
-                  statusColor={
-                    tx.status === "completed"
-                      ? "success"
-                      : tx.status === "pending"
-                        ? "pending"
-                        : "danger"
-                  }
-                />
-              </View>
-            );
-          })
+          transactions.map((tx, index) => (
+            <View key={tx.id}>
+              <TransactionRow
+                type={getTxType(tx)}
+                title={getTxDisplayTitle(tx)}
+                subtitle={getTxSubtitle(tx, formatDate)}
+                amount={parseFloat(tx.amount)}
+                isCredit={tx.type === "credit"}
+                status={tx.status}
+              />
+              {/* Divider — only on home page list style */}
+              {index < transactions.length - 1 && (
+                <View style={{ height: 1, backgroundColor: "#30363D" }} />
+              )}
+            </View>
+          ))
         ) : (
           <View className="bg-[#161B22] rounded-xl p-10 items-center justify-center mb-8">
             <WalletIcon size={40} color="#30363D" />

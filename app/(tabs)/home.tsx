@@ -26,10 +26,7 @@ import { useMyEscrows } from "@/lib/hooks/useEscrow";
 import { useTransactions } from "@/lib/hooks/useTransactions";
 import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import {
-  TransactionRow,
-  TransactionType,
-} from "@/components/ui/TransactionRow";
+import { TransactionRow } from "@/components/ui/TransactionRow";
 import { EscrowProgressBar } from "@/components/ui/EscrowProgressBar";
 import { Avatar } from "@/components/ui/Avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
@@ -43,6 +40,12 @@ import Animated, {
   withTiming,
   withSequence,
 } from "react-native-reanimated";
+import {
+  getTxType,
+  getTxDisplayTitle,
+  getTxSubtitle,
+} from "@/lib/utils/transactions";
+import transactions from "../transactions";
 
 const { width } = Dimensions.get("window");
 
@@ -449,7 +452,7 @@ export default function HomeScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-          <View className="bg-[#161B22] rounded-xl px-5">
+          <View className="bg-[#161B22] rounded-xl px-5 py-4">
             {isTransactionsLoading ? (
               <View className="py-10 items-center">
                 <Text
@@ -460,38 +463,23 @@ export default function HomeScreen() {
                 </Text>
               </View>
             ) : recentTransactions.length > 0 ? (
-              recentTransactions.map((tx, index) => {
-                const isCredit = tx.type === "credit";
-
-                let type: TransactionType = "funded";
-                if (tx.description.includes("Escrow released"))
-                  type = "released";
-                if (tx.description.includes("Withdrawal")) type = "disputed"; // Red color
-                if (tx.description.includes("Wallet fund")) type = "funded"; // Yellow color
-
-                return (
-                  <View key={tx.id}>
+              <>
+                {recentTransactions.map((tx, index) => (
+                  <React.Fragment key={tx.id}>
                     <TransactionRow
-                      type={type}
-                      title={tx.description}
-                      subtitle={`${tx.reference.substring(0, 8)} • ${formatDate(tx.created_at)}`}
+                      type={getTxType(tx)}
+                      title={getTxDisplayTitle(tx)}
+                      subtitle={getTxSubtitle(tx, formatDate)}
                       amount={parseFloat(tx.amount)}
-                      isCredit={isCredit}
-                      status={tx.status.toUpperCase()}
-                      statusColor={
-                        tx.status === "completed"
-                          ? "success"
-                          : tx.status === "pending"
-                            ? "pending"
-                            : "danger"
-                      }
+                      isCredit={tx.type === "credit"}
+                      status={tx.status}
                     />
                     {index < recentTransactions.length - 1 && (
-                      <View className="h-[1px] bg-[#30363D]" />
+                      <View style={{ height: 1, backgroundColor: "#30363D" }} />
                     )}
-                  </View>
-                );
-              })
+                  </React.Fragment>
+                ))}
+              </>
             ) : (
               <View className="py-10 items-center">
                 <Text

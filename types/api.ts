@@ -53,6 +53,8 @@ export interface Transaction {
   id: number;
   user_id: string;
   wallet_id: number;
+  escrow_id: string | null;
+  context: string | null;
   type: "credit" | "debit";
   amount: string; // decimal string "1000000.00"
   balance_before: string;
@@ -69,6 +71,7 @@ export interface Transaction {
   updated_at: string;
   deleted_at: string | null;
 }
+
 
 export interface LedgerBalance {
   balance: number;
@@ -182,3 +185,11 @@ export interface Notification {
   read_at: string | null;
   created_at: string;
 }
+
+
+export type TransactionType =
+  | "wallet_fund"    // Paystack credit → wallet
+  | "withdrawal"     // Wallet debit → bank
+  | "escrow_debit"   // Wallet debit → escrow vault
+  | "escrow_credit"  // Escrow release → wallet
+  | "debit"          // Generic debit
