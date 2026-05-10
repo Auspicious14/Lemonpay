@@ -10,6 +10,7 @@ import {
   Keyboard,
   Modal,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/ui/Screen";
 import { Typography } from "@/components/ui/Typography";
@@ -23,6 +24,7 @@ import { WheelPicker } from "@/components/ui/WheelPicker";
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const setPersonalDetails = useRegistrationStore(
     (state) => state.setPersonalDetails,
   );
@@ -308,7 +310,12 @@ export default function RegisterScreen() {
           </ScrollView>
 
           {/* Bottom Bar */}
-          <View style={styles.bottomBar}>
+        <View
+          style={[
+            styles.bottomBar,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
+        >
             <TouchableOpacity
               onPress={() => router.back()}
               className="flex-row items-center"

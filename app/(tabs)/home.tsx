@@ -160,7 +160,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0D1117]">
+    <SafeAreaView className="flex-1 bg-[#0D1117]" edges={["top", "left", "right"]}>
       <StatusBar style="light" />
 
       {/* HEADER */}
