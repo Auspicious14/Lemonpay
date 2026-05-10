@@ -22,6 +22,7 @@ import { Toast } from "@/components/ui/Toast";
 import BottomSheet, {
   BottomSheetView,
   BottomSheetBackdrop,
+  BottomSheetFlatList,
 } from "@gorhom/bottom-sheet";
 
 export default function RegisterScreen() {
@@ -352,7 +353,7 @@ export default function RegisterScreen() {
                 {/* Day */}
                 <View className="flex-1">
                   <Typography style={styles.pickerLabel}>DAY</Typography>
-                  <FlatList
+                  <BottomSheetFlatList
                     data={days}
                     keyExtractor={(item) => item}
                     renderItem={({ item }) => (
@@ -378,7 +379,7 @@ export default function RegisterScreen() {
                 {/* Month */}
                 <View className="flex-[2]">
                   <Typography style={styles.pickerLabel}>MONTH</Typography>
-                  <FlatList
+                  <BottomSheetFlatList
                     data={months}
                     keyExtractor={(item) => item}
                     renderItem={({ item }) => (
@@ -404,7 +405,7 @@ export default function RegisterScreen() {
                 {/* Year */}
                 <View className="flex-[1.5]">
                   <Typography style={styles.pickerLabel}>YEAR</Typography>
-                  <FlatList
+                  <BottomSheetFlatList
                     data={years}
                     keyExtractor={(item) => item}
                     renderItem={({ item }) => (

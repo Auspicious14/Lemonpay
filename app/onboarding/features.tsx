@@ -32,7 +32,7 @@ export default function FeaturesSlide() {
           </Typography>
           <Typography variant="body" className="!text-gray-400 mb-8">
             Verified transactions are settled in{" "}
-            <Typography className="!text-secondary">ms.</Typography>
+            <Typography className="!text-secondary">seconds.</Typography>
           </Typography>
 
           <View>

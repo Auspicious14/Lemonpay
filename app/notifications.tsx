@@ -181,7 +181,7 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: "#0D1117" }}
-      edges={["top", "left", "right"]}
+      edges={["top", "left", "right", "bottom"]}
     >
       <StatusBar style="light" />
 

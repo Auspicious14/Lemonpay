@@ -30,7 +30,7 @@ export const Screen: React.FC<ScreenProps> = ({
   return (
     <SafeAreaView
       className="flex-1 bg-[#0D1117]"
-      edges={["top", "left", "right"]}
+      edges={["top", "left", "right", "bottom"]}
     >
       <StatusBar style="light" />
 

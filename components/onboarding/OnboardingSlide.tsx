@@ -59,7 +59,7 @@ export const OnboardingSlide = ({
   return (
     <SafeAreaView
       className="flex-1 bg-[#0D1117] px-6"
-      edges={["top", "bottom"]}
+      edges={["top", "bottom", "left", "right"]}
     >
       {/* Header */}
       <View className="flex-row items-center justify-between py-2">
