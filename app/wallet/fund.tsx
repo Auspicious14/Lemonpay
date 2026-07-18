@@ -41,10 +41,10 @@ export default function FundWalletScreen() {
   };
 
   const handleContinue = async () => {
-    if (selectedMethod === "bank") {
-      router.push("/wallet/bank-transfer");
-      return;
-    }
+    // if (selectedMethod === "bank") {
+    //   router.push("/wallet/bank-transfer");
+    //   return;
+    // }
 
     // For card/ussd, show amount sheet
     setIsAmountSheetVisible(true);
@@ -208,12 +208,12 @@ export default function FundWalletScreen() {
                   >
                     Bank Transfer
                   </Typography>
-                  <Typography
+                  {/* <Typography
                     style={{ fontFamily: "Inter" }}
                     className="text-[#8B949E] text-xs"
                   >
                     Recommended, 0% fees
-                  </Typography>
+                  </Typography> */}
                 </View>
                 <View className="bg-[#003829] px-3 py-1 rounded-full">
                   <Typography
@@ -226,13 +226,8 @@ export default function FundWalletScreen() {
               </TouchableOpacity>
 
               {/* Card */}
-              <TouchableOpacity
-                onPress={() => setSelectedMethod("card")}
-                className={`flex-row items-center p-5 bg-[#161B22] rounded-[24px] border ${
-                  selectedMethod === "card"
-                    ? "border-[#F5E642]"
-                    : "border-[#30363D]"
-                }`}
+              <View
+                className={`flex-row items-center p-5 bg-[#161B22] rounded-[24px] border border-[#30363D] opacity-70`}
               >
                 <View className="w-12 h-12 bg-[#21262D] rounded-xl items-center justify-center mr-4">
                   <MaterialCommunityIcons
@@ -255,16 +250,19 @@ export default function FundWalletScreen() {
                     Instant, 1.5% fee
                   </Typography>
                 </View>
-              </TouchableOpacity>
+                <View className="bg-[#21262D] px-3 py-1 rounded-full">
+                  <Typography
+                    style={{ fontFamily: "Inter-Bold" }}
+                    className="text-[#8B949E] text-[10px] uppercase"
+                  >
+                    Coming Soon
+                  </Typography>
+                </View>
+              </View>
 
               {/* USSD */}
-              <TouchableOpacity
-                onPress={() => setSelectedMethod("ussd")}
-                className={`flex-row items-center p-5 bg-[#161B22] rounded-[24px] border ${
-                  selectedMethod === "ussd"
-                    ? "border-[#F5E642]"
-                    : "border-[#30363D]"
-                }`}
+              <View
+                className={`flex-row items-center p-5 bg-[#161B22] rounded-[24px] border border-[#30363D] opacity-70`}
               >
                 <View className="w-12 h-12 bg-[#21262D] rounded-xl items-center justify-center mr-4">
                   <MaterialCommunityIcons
@@ -287,7 +285,15 @@ export default function FundWalletScreen() {
                     Quick, 1% fee
                   </Typography>
                 </View>
-              </TouchableOpacity>
+                <View className="bg-[#21262D] px-3 py-1 rounded-full">
+                  <Typography
+                    style={{ fontFamily: "Inter-Bold" }}
+                    className="text-[#8B949E] text-[10px] uppercase"
+                  >
+                    Coming Soon
+                  </Typography>
+                </View>
+              </View>
             </View>
           </View>
         </ScrollView>
