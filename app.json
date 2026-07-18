@@ -5,11 +5,11 @@
     "scheme": "lympay",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/lymepay-icon.png",
+    "icon": "./assets/Logos/PNG/PNG Coloured.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/lymepay-icon.png",
+      "image": "./assets/Logos/PNG/PNG Coloured.png",
       "resizeMode": "cover",
       "backgroundColor": "#0D1117"
     },
@@ -23,7 +23,7 @@
     "android": {
       "package": "com.auspicious14.lymepay",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/lymepay-icon.png",
+        "foregroundImage": "./assets/Logos/PNG/PNG Coloured.png",
         "backgroundColor": "#0D1117"
       },
       "permissions": [
@@ -35,7 +35,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/lymepay-icon.png"
+      "favicon": "./assets/Logos/PNG/PNG Coloured.png"
     },
     "plugins": [
       "expo-router",
@@ -44,7 +44,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/lymepay-icon.png",
+          "image": "./assets/Logos/PNG/PNG Coloured.png",
           "resizeMode": "cover",
           "backgroundColor": "#F5E642"
         }
@@ -52,7 +52,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/lymepay-icon.png",
+          "icon": "./assets/Logos/PNG/PNG Coloured.png",
           "color": "#F5E642",
           "sounds": []
         }
