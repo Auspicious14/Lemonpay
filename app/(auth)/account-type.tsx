@@ -48,7 +48,7 @@ export default function AccountTypeScreen() {
         {/* Top Wordmark */}
         <View style={{ marginBottom: 24, marginTop: 12 }}>
           <Image 
-            source={require('@/assets/Logos/png/lympay-white.png')}
+            source={require('@/assets/Logos/PNG/lympay-white.png')}
             style={{ width: 120, height: 40 }}
             resizeMode="contain"
           />

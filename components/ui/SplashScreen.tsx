@@ -30,7 +30,7 @@ export const SplashScreen = () => {
         style={{ transform: [{ scale: pulseAnim }], alignItems: "center" }}
       >
         <Image 
-          source={require('@/assets/Logos/png/lympay-coloured.png')}
+          source={require('@/assets/Logos/PNG/lympay-coloured.png')}
           style={{ width: 180, height: 60 }}
           resizeMode="contain"
         />

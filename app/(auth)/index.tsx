@@ -262,7 +262,7 @@ export default function OnboardingScreen() {
       {/* Dynamic Header */}
       <View className="flex-row items-center justify-between px-6 pt-12 pb-4">
         <Image 
-          source={require('@/assets/Logos/png/lympay-white.png')}
+          source={require('@/assets/Logos/PNG/lympay-white.png')}
           style={{ width: 120, height: 40 }}
           resizeMode="contain"
         />

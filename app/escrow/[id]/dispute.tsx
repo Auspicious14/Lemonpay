@@ -137,7 +137,7 @@ export default function RaiseDisputeScreen() {
           </Typography>
         </TouchableOpacity>
         <Image 
-          source={require('@/assets/Logos/png/lympay-white.png')}
+          source={require('@/assets/Logos/PNG/lympay-white.png')}
           style={{ width: 80, height: 24 }}
           resizeMode="contain"
         />

@@ -44,7 +44,7 @@ import { useDialogStore } from "@/store/useDialogStore";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { NotificationBell } from "@/components/ui/NotificationBell";
-import { Escrow } from "@/types/api";
+import { Escrow, EscrowStatusEnum } from "@/types/api";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FULL STATUS LIFECYCLE (from API):
@@ -886,7 +886,7 @@ export default function EscrowDetailScreen() {
                   </Text>
                 </View>
               </View>
-              {escrow.buyer_confirmation_deadline && (
+              {escrow.status === EscrowStatusEnum.PENDING_BUYER_CONFIRMATION && escrow.buyer_confirmation_deadline && (
                 <>
                   <View style={{ height: 1, backgroundColor: "#30363D" }} />
                   <View style={{ padding: 16 }}>

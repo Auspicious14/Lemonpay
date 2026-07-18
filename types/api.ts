@@ -119,6 +119,20 @@ export type EscrowStatus =
   | "resolved"
   | "refunded";
 
+export enum EscrowStatusEnum {
+  PENDING_SELLER_AGREEMENT = "pending_seller_agreement",
+  PENDING_BUYER_CONFIRMATION = "pending_buyer_confirmation",
+  PENDING_SELLER_CONFIRMATION = "pending_seller_confirmation",
+  AWAITING_SELLER_CONFIRMATION = "awaiting_seller_confirmation",
+  LOCKED = "locked",
+  FUNDED = "funded",
+  AWAITING_BUYER_RELEASE = "awaiting_buyer_release",
+  RELEASED = "released",
+  DISPUTED = "disputed",
+  RESOLVED = "resolved",
+  REFUNDED = "refunded",
+}
+
 export interface Escrow {
   id: number;
   uuid: string;
@@ -132,7 +146,7 @@ export interface Escrow {
   buyer_terms: string;
   seller_terms: string;
   final_agreement: string;
-  status: EscrowStatus;
+  status: EscrowStatusEnum;
   locked_at: string | null;
   funded_at: string | null;
   delivery_marked_at: string | null;
