@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
+import { View, Image, StyleSheet, Animated } from "react-native";
 
 const LEMON_YELLOW = "#F5E642";
 const DARK_BG = "#0D1117";
@@ -29,8 +29,11 @@ export const SplashScreen = () => {
       <Animated.View
         style={{ transform: [{ scale: pulseAnim }], alignItems: "center" }}
       >
-        <Text style={styles.logo}>🍋</Text>
-        <Text style={styles.wordmark}>LymePay</Text>
+        <Image 
+          source={require('@/assets/Logos/png/lympay-coloured.png')}
+          style={{ width: 180, height: 60 }}
+          resizeMode="contain"
+        />
       </Animated.View>
     </View>
   );

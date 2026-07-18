@@ -75,7 +75,7 @@ export default function DisputeDetailScreen() {
     { 
       id: 2, 
       label: "Review Started", 
-      subtext: "Assigned to a LymePay specialist.",
+      subtext: "Assigned to a LymPay specialist.",
       status: ["under_review", "evidence_review", "resolved"].includes(dispute.status) ? "completed" : "pending"
     },
     { 

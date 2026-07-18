@@ -6,7 +6,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // High-End Editorial Palette (The LymePay)
+        // High-End Editorial Palette (The LymPay)
         surface: {
           DEFAULT: "#10141a",
           dim: "#10141a",
@@ -29,10 +29,6 @@ module.exports = {
         on: {
           primary: {
             fixed: "#1f1c00",
-            container: "#6e6600",
-          },
-          secondary: {
-            container: "#004d38",
           },
           surface: {
             variant: "#ccc7ad",
@@ -54,11 +50,9 @@ module.exports = {
         accent: {
           primary: "#f5e642",
           success: "#01c896",
-          danger: "#ffb4ab", // map to error
-          warning: "#f5e642", // map to primary_container
-          info: "#b1c5ff", // map to tertiary_fixed_dim
+          danger: "#ffb4ab",
+          warning: "#f5e642",
         },
-        lemon: "#f5e642",
         text: {
           primary: "#ffffff",
           secondary: "#ccc7ad",

@@ -38,7 +38,7 @@ export default function ResolutionReachedScreen() {
   const handleDownloadReceipt = async () => {
     try {
       await Share.share({
-        message: `LymePay Dispute Resolution\nCase ID: #${uuid?.substring(0, 8).toUpperCase()}\nAmount: ₦${parseFloat(escrow?.amount || "0").toLocaleString()}\nStatus: Full Refund Approved`,
+        message: `LymPay Dispute Resolution\nCase ID: #${uuid?.substring(0, 8).toUpperCase()}\nAmount: ₦${parseFloat(escrow?.amount || "0").toLocaleString()}\nStatus: Full Refund Approved`,
       });
     } catch (error) {
       console.error(error);
@@ -160,7 +160,7 @@ export default function ResolutionReachedScreen() {
                 style={{ fontFamily: "Inter" }}
                 className="text-gray-500 text-xs mt-0.5 leading-4"
               >
-                Funds will reflect in your LymePay wallet within 30 minutes.
+                Funds will reflect in your LymPay wallet within 30 minutes.
               </Typography>
             </View>
           </View>

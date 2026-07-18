@@ -81,7 +81,7 @@ export default function ReviewEscrowScreen() {
                     variant="label-sm"
                     className="text-secondary text-[8px] uppercase font-inter-extrabold tracking-widest"
                   >
-                    Secured by LymePay
+                    Secured by LymPay
                   </Typography>
                 </View>
               </View>
@@ -183,7 +183,7 @@ export default function ReviewEscrowScreen() {
                 {
                   id: "03",
                   title: "Dispute Resolution",
-                  body: "Independent LymePay arbitration team will review evidence within 24 hours if needed.",
+                  body: "Independent LymPay arbitration team will review evidence within 24 hours if needed.",
                 },
               ].map((term, i) => (
                 <View key={term.id} className="flex-row space-x-4">

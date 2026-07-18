@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Keyboard,
   Modal,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -136,11 +137,12 @@ export default function RegisterScreen() {
             keyboardShouldPersistTaps="handled"
           >
             {/* Brand */}
-            <View className="flex-row items-center mb-6">
-              <Ionicons name="shield-checkmark" size={20} color="#F5E642" />
-              <Typography variant="subheading" className="!text-primary-fixed">
-                LYMEPAY
-              </Typography>
+            <View style={{ marginBottom: 24, marginTop: 12 }}>
+              <Image 
+                source={require('@/assets/Logos/png/lympay-white.png')}
+                style={{ width: 120, height: 40 }}
+                resizeMode="contain"
+              />
             </View>
 
             <StepProgressBar currentStep={1} totalSteps={3} />
@@ -204,7 +206,7 @@ export default function RegisterScreen() {
                     style={{ marginLeft: 16 }}
                   />
                   <TextInput
-                    placeholder="chinedu.o@lymepay.com"
+                    placeholder="chinedu.o@lympay.com"
                     placeholderTextColor="#484F58"
                     value={email}
                     onChangeText={setEmail}

@@ -7,7 +7,7 @@ import {
   PaginatedResponse,
   EscrowStatus,
 } from "@/types/api";
-// Lazy import to avoid circular deps — notifications service is self-contained
+// Lazy import to avoid circular deps - notifications service is self-contained
 import { notificationService } from "@/services/notifications";
 
 export const useMyEscrows = (status?: EscrowStatus, page = 1) => {
@@ -185,6 +185,8 @@ export const useMarkDelivered = (id: string | number) => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["escrow", id] });
+      queryClient.invalidateQueries({ queryKey: ["my-escrows"] });
+      queryClient.invalidateQueries({ queryKey: ["escrows"] });
       notificationService.scheduleLocal(
         "Delivery Update",
         "Check your escrow status",

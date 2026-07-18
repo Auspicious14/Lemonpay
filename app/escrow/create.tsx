@@ -139,7 +139,7 @@ export default function CreateEscrowScreen() {
           Create New Escrow
         </Typography>
         <Typography variant="body" className="text-[#8B949E]">
-          Set the terms for your transaction. The LymePay ensures funds are
+          Set the terms for your transaction. The LymPay ensures funds are
           held safely until all conditions are met.
         </Typography>
       </View>
@@ -572,7 +572,7 @@ export default function CreateEscrowScreen() {
                 lineHeight: 17,
               }}
             >
-              LymePay mediators will intervene if an agreement cannot be
+              LymPay mediators will intervene if an agreement cannot be
               reached within 48 hours.
             </Text>
           </View>
@@ -723,7 +723,7 @@ export default function CreateEscrowScreen() {
         >
           I agree to the{" "}
           <Text style={{ fontFamily: "Inter-Bold", color: "#F5E642" }}>
-            LymePay Escrow Terms
+            LymPay Escrow Terms
           </Text>{" "}
           and the specific transaction agreement details listed above.
         </Text>
@@ -882,7 +882,7 @@ export default function CreateEscrowScreen() {
                 Dispute Resolution
               </Typography>
               <Typography variant="caption" className="!text-[#8B949E] text-sm">
-                Any disagreements will be handled by LymePay's independent
+                Any disagreements will be handled by LymPay's independent
                 mediators for a fair outcome.
               </Typography>
             </View>
@@ -991,7 +991,7 @@ export default function CreateEscrowScreen() {
             }}
           >
             {step === 1
-              ? "By proceeding, you agree to LymePay's Escrow Protection"
+              ? "By proceeding, you agree to LymPay's Escrow Protection"
               : step === 2
                 ? "Edit Details"
                 : "Edit Terms"}
@@ -1018,7 +1018,7 @@ export default function CreateEscrowScreen() {
               color: "#F5E642", 
               fontSize: 20 
             }}>
-              LymePay
+              LymPay
             </Text>
             <View style={{ flexDirection: "row", gap: 16 }}>
               <Minus size={22} color="#484f58" />

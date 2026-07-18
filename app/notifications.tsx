@@ -18,12 +18,15 @@ import {
   CheckCircle2,
   AlertTriangle,
   Info,
+  Trash2,
 } from "lucide-react-native";
 import {
   useNotifications,
   useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+  useDeleteNotification,
+  AppNotification,
 } from "@/lib/hooks/useNotifications";
-import { Notification } from "@/types/api";
 import { formatDate } from "@/lib/utils/format";
 
 // Icon per notification type
@@ -62,12 +65,14 @@ export default function NotificationsScreen() {
     isRefetching,
   } = useNotifications();
   const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
+  const deleteNotif = useDeleteNotification();
 
   const onRefresh = useCallback(() => {
     refetch();
   }, [refetch]);
 
-  const handleTap = (notif: Notification) => {
+  const handleTap = (notif: AppNotification) => {
     // Mark read
     if (!notif.read_at) {
       markRead.mutate(notif.id);
@@ -85,7 +90,11 @@ export default function NotificationsScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: Notification }) => {
+  const handleDelete = (id: string) => {
+    deleteNotif.mutate(id);
+  };
+
+  const renderItem = ({ item }: { item: AppNotification }) => {
     const isUnread = !item.read_at;
     const notifType: string = item.type ?? "info";
     const title: string =
@@ -94,87 +103,107 @@ export default function NotificationsScreen() {
     const body: string = item.data?.body ?? item.data?.message ?? "";
 
     return (
-      <TouchableOpacity
-        onPress={() => handleTap(item)}
-        activeOpacity={0.75}
+      <View
         style={{
           flexDirection: "row",
           alignItems: "flex-start",
-          padding: 16,
-          backgroundColor: isUnread ? "#1C2230" : "#161B22",
-          borderRadius: 16,
           marginBottom: 10,
-          borderWidth: 1,
-          borderColor: isUnread ? "#F5E64220" : "#30363D",
         }}
       >
-        {/* Left Icon */}
-        <View
+        <TouchableOpacity
+          onPress={() => handleTap(item)}
+          activeOpacity={0.75}
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            backgroundColor: iconBg(notifType),
-            alignItems: "center",
-            justifyContent: "center",
-            marginRight: 12,
+            flexDirection: "row",
+            alignItems: "flex-start",
+            padding: 16,
+            backgroundColor: isUnread ? "#1C2230" : "#161B22",
+            borderRadius: 16,
+            flex: 1,
+            borderWidth: 1,
+            borderColor: isUnread ? "#F5E64220" : "#30363D",
           }}
         >
-          <NotifIcon type={notifType} />
-        </View>
-
-        {/* Content */}
-        <View style={{ flex: 1 }}>
-          <Text
+          {/* Left Icon */}
+          <View
             style={{
-              fontFamily: "Inter-Bold",
-              color: "white",
-              fontSize: 14,
-              marginBottom: 3,
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: iconBg(notifType),
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 12,
             }}
-            numberOfLines={1}
           >
-            {title}
-          </Text>
-          {!!body && (
+            <NotifIcon type={notifType} />
+          </View>
+
+          {/* Content */}
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontFamily: "Inter-Bold",
+                color: "white",
+                fontSize: 14,
+                marginBottom: 3,
+              }}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+            {!!body && (
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  color: "#8B949E",
+                  fontSize: 12,
+                  lineHeight: 18,
+                }}
+                numberOfLines={2}
+              >
+                {body}
+              </Text>
+            )}
             <Text
               style={{
                 fontFamily: "Inter",
-                color: "#8B949E",
-                fontSize: 12,
-                lineHeight: 18,
+                color: "#484f58",
+                fontSize: 10,
+                marginTop: 6,
               }}
-              numberOfLines={2}
             >
-              {body}
+              {formatDate(item.created_at)}
             </Text>
-          )}
-          <Text
-            style={{
-              fontFamily: "Inter",
-              color: "#484f58",
-              fontSize: 10,
-              marginTop: 6,
-            }}
-          >
-            {formatDate(item.created_at)}
-          </Text>
-        </View>
+          </View>
 
-        {/* Unread dot */}
-        {isUnread && (
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: "#FF4D4F",
-              marginLeft: 8,
-              marginTop: 4,
-            }}
-          />
-        )}
-      </TouchableOpacity>
+          {/* Unread dot */}
+          {isUnread && (
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: "#FF4D4F",
+                marginLeft: 8,
+                marginTop: 4,
+              }}
+            />
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleDelete(item.id)}
+          style={{
+            width: 44,
+            height: "100%",
+            justifyContent: "center",
+            alignItems: "center",
+            marginLeft: 8,
+          }}
+        >
+          <Trash2 size={20} color="#FF4D4F" />
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -222,18 +251,29 @@ export default function NotificationsScreen() {
         >
           Notifications
         </Text>
-        <View
+        <TouchableOpacity
+          onPress={() => markAllRead.mutate()}
           style={{
-            width: 36,
-            height: 36,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
             borderRadius: 10,
             backgroundColor: "#1C2026",
+            borderWidth: 1,
+            borderColor: "#30363D",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <Bell size={18} color="#F5E642" />
-        </View>
+          <Text
+            style={{
+              fontFamily: "Inter-Bold",
+              color: "#F5E642",
+              fontSize: 12,
+            }}
+          >
+            Mark all read
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList

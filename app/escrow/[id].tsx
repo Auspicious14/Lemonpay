@@ -560,7 +560,7 @@ export default function EscrowDetailScreen() {
       disputed: {
         icon: <Gavel size={24} color="#FF4D4F" />,
         title: "Dispute Under Review",
-        sub: "LymePay mediators are reviewing the evidence provided. Funds are locked.",
+        sub: "LymPay mediators are reviewing the evidence provided. Funds are locked.",
         bg: "#FF4D4F15",
         border: "#FF4D4F40",
       },
@@ -624,7 +624,7 @@ export default function EscrowDetailScreen() {
       {
         id: 2,
         title: "Payment Secured",
-        sub: "Buyer funds locked in LymePay vault.",
+        sub: "Buyer funds locked in LymPay vault.",
         time: escrow.funded_at ? formatDate(escrow.funded_at) : "",
       },
       {

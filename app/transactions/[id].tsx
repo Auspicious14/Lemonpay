@@ -22,7 +22,7 @@ export default function TransactionDetailScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `LymePay Transaction Detail: ${id || "LP-TRANX-847291"}`,
+        message: `LymPay Transaction Detail: ${id || "LP-TRANX-847291"}`,
       });
     } catch (error) {
       console.error(error);
@@ -134,7 +134,7 @@ export default function TransactionDetailScreen() {
                     Bank Reference
                   </Typography>
                   <Typography variant="body" className="font-bold">
-                    LymePay-98273
+                    LymPay-98273
                   </Typography>
                 </View>
                 <View className="w-1/2 space-y-1">

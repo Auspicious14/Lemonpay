@@ -136,12 +136,11 @@ export default function RaiseDisputeScreen() {
             Dispute Center
           </Typography>
         </TouchableOpacity>
-        <Typography 
-          style={{ fontFamily: "Inter-ExtraBold" }}
-          className="text-[#F5E642] text-lg"
-        >
-          LymePay
-        </Typography>
+        <Image 
+          source={require('@/assets/Logos/png/lympay-white.png')}
+          style={{ width: 80, height: 24 }}
+          resizeMode="contain"
+        />
       </View>
 
       <ScrollView 
@@ -355,7 +354,7 @@ export default function RaiseDisputeScreen() {
               style={{ fontFamily: "Inter" }}
               className="text-gray-400 text-xs mt-1 leading-4"
             >
-              LymePay will share these details with the counterparty to facilitate a response. Sensitive data should be redacted from evidence where possible.
+              LymPay will share these details with the counterparty to facilitate a response. Sensitive data should be redacted from evidence where possible.
             </Typography>
           </View>
         </View>

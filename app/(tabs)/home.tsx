@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Dimensions,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -165,22 +166,11 @@ export default function HomeScreen() {
 
       {/* HEADER */}
       <View className="px-6 py-4 flex-row justify-between items-center bg-[#0D1117]">
-        <View className="flex-row items-center">
-          <View className="w-8 h-8 rounded-full bg-accent-primary items-center justify-center mr-2">
-            <Text
-              style={{ fontFamily: "Inter-Bold" }}
-              className="text-[#0D1117] text-lg"
-            >
-              {user?.first_name?.charAt(0) || "L"}
-            </Text>
-          </View>
-          <Text
-            style={{ fontFamily: "Inter-Bold" }}
-            className="text-white text-xl"
-          >
-            LymePay
-          </Text>
-        </View>
+        <Image 
+          source={require('@/assets/Logos/png/lympay-white.png')}
+          style={{ width: 120, height: 40 }}
+          resizeMode="contain"
+        />
         <View className="flex-row items-center gap-x-4">
           <NotificationBell color="white" size={24} />
           <Avatar
@@ -293,7 +283,7 @@ export default function HomeScreen() {
                 style={{ fontFamily: "Inter" }}
                 className="text-[#8B949E] text-[10px] ml-1 uppercase"
               >
-                Secure by LymePay Guard
+                Secure by LymPay Guard
               </Text>
             </View>
           </View>
@@ -505,7 +495,7 @@ export default function HomeScreen() {
             style={{ fontFamily: "Inter-Bold" }}
             className="text-[#8B949E] text-[8px] ml-1 tracking-widest uppercase"
           >
-            SECURE BY LYMEPAY GUARD V2.4
+            SECURE BY LYMPAY GUARD V2.4
           </Text>
         </View>
       </View>

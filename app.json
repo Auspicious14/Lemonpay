@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "LymePay",
-    "slug": "lymepay",
-    "scheme": "lymepay",
+    "name": "LymPay",
+    "slug": "lympay",
+    "scheme": "lympay",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/lymepay-icon.png",

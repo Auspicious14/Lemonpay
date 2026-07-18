@@ -225,7 +225,7 @@ export default function WithdrawSuccessScreen() {
               style={{ fontFamily: "Inter", fontSize: 10 }}
               className="text-[#8B949E]"
             >
-              Securely processed by LymePay Escrow Sentinel
+              Securely processed by LymPay Escrow Sentinel
             </Typography>
           </View>
         </View>

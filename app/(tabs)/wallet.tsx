@@ -77,7 +77,7 @@ export default function WalletScreen() {
             size="sm"
             className="rounded-full border-0 mr-3"
           />
-          <Text className="text-white font-inter-bold text-xl">LymePay</Text>
+          <Text className="text-white font-inter-bold text-xl">LymPay</Text>
         </View>
         <TouchableOpacity
           className="w-10 h-10 items-center justify-center"
@@ -154,7 +154,7 @@ export default function WalletScreen() {
           </View>
           <View className="flex-1">
             <Text className="text-white font-inter-bold text-lg">
-              Secure by LymePay
+              Secure by LymPay
             </Text>
             <Text className="text-[#8B949E] font-inter text-xs mt-1">
               Your funds are held in a secure CBN-licensed escrow account.

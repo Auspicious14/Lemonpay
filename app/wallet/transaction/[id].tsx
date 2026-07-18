@@ -59,7 +59,7 @@ export default function TransactionDetailScreen() {
 
   const handleShare = async () => {
     const receiptText = `
-===== LYMEPAY RECEIPT =====
+===== LYMPAY RECEIPT =====
 Reference: ${transaction.reference}
 Amount: ₦${amount.toLocaleString()}
 Type: ${transaction.type.toUpperCase()}
@@ -160,7 +160,7 @@ Date: ${formatDate(transaction.created_at)}
             </View>
             <View style={styles.gridCell}>
               <Text style={styles.cellLabel}>Counterparty</Text>
-              <Text style={styles.cellValue}>LymePay</Text>
+              <Text style={styles.cellValue}>LymPay</Text>
             </View>
             <View style={styles.gridCell}>
               <Text style={styles.cellLabel}>Bank Reference</Text>

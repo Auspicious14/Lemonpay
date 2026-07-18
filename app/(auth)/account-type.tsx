@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import { View, TouchableOpacity, ScrollView, StyleSheet, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/ui/Screen";
 import { Typography } from "@/components/ui/Typography";
@@ -46,11 +46,12 @@ export default function AccountTypeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Top Wordmark */}
-        <View className="flex-row items-center mb-6">
-          <Ionicons name="shield-checkmark" size={20} color="#F5E642" />
-          <Typography variant="subheading" className="!text-primary-fixed">
-            LYMEPAY
-          </Typography>
+        <View style={{ marginBottom: 24, marginTop: 12 }}>
+          <Image 
+            source={require('@/assets/Logos/png/lympay-white.png')}
+            style={{ width: 120, height: 40 }}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Progress */}

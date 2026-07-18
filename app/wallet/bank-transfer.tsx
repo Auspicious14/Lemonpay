@@ -237,11 +237,11 @@ export default function BankTransferScreen() {
               BANK NAME
             </Typography>
             <Typography variant="body" className="!text-white" weight="700">
-              Wema Bank (LymePay)
+              Wema Bank (LymPay)
             </Typography>
           </View>
           <TouchableOpacity
-            onPress={() => handleCopy("Wema Bank (LymePay)", "Bank Name")}
+            onPress={() => handleCopy("Wema Bank (LymPay)", "Bank Name")}
             className="w-10 h-10 bg-[#21262D] rounded-xl items-center justify-center"
           >
             <Feather name="copy" size={18} color="#F5E642" />
@@ -295,13 +295,13 @@ export default function BankTransferScreen() {
               BENEFICIARY
             </Typography>
             <Typography variant="body" className="!text-white" weight="700">
-              LymePay / {user?.first_name} {user?.last_name}
+              LymPay / {user?.first_name} {user?.last_name}
             </Typography>
           </View>
           <TouchableOpacity
             onPress={() =>
               handleCopy(
-                `LymePay / ${user?.first_name} ${user?.last_name}`,
+                `LymPay / ${user?.first_name} ${user?.last_name}`,
                 "Beneficiary",
               )
             }
@@ -370,7 +370,7 @@ export default function BankTransferScreen() {
           </Typography>
         </View>
         <Typography variant="body" className="!text-[#F5E642]" weight="800">
-          LYMEPAY
+          LYMPAY
         </Typography>
       </View>
 

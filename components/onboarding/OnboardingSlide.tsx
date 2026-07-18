@@ -1,5 +1,5 @@
 import React from "react";
-import { View, TouchableOpacity, ScrollView, ViewStyle } from "react-native";
+import { View, TouchableOpacity, ScrollView, ViewStyle, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -63,17 +63,11 @@ export const OnboardingSlide = ({
     >
       {/* Header */}
       <View className="flex-row items-center justify-between py-2">
-        <View className="flex-row items-center gap-2">
-          <View className="w-8 h-8 items-center justify-center bg-primary-fixed rounded-lg">
-            <Shield size={20} color="#1f1c00" fill="#1f1c00" />
-          </View>
-          <Typography
-            variant="subheading"
-            className="!text-primary-fixed tracking-tight font-inter-bold"
-          >
-            LymePay{" "}
-          </Typography>
-        </View>
+        <Image 
+          source={require('@/assets/Logos/png/lympay-white.png')}
+          style={{ width: 120, height: 40 }}
+          resizeMode="contain"
+        />
         <Typography variant="label-sm" className="!text-gray-500">
           STEP {step.toString().padStart(2, "0")} /{" "}
           {totalSteps.toString().padStart(2, "0")}

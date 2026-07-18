@@ -11,6 +11,8 @@ import { useQuery, useQueryClient, QueryClient } from "@tanstack/react-query";
 import { TokenStorage } from "../lib/storage";
 import { apiClient } from "../lib/api/client";
 import { appEvents } from "../lib/api/event-emitter";
+import { notificationService } from "@/services/notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface User {
   id: string;
@@ -311,6 +313,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      const storedPushToken = await AsyncStorage.getItem('lympay_push_token');
+      if (storedPushToken) {
+        await notificationService.deregisterPushToken(storedPushToken);
+      }
+
       const token = await TokenStorage.getToken();
       if (token) {
         await apiClient.post("/auth/logout");

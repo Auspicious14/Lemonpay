@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -53,7 +54,7 @@ export default function OnboardingScreen() {
       title: "Secure",
       highlight: "Every Trade",
       description:
-        "The guardian of your digital commerce. We hold funds in a lymepay vault until every promise is kept, ensuring absolute transparency in every transaction.",
+        "The guardian of your digital commerce. We hold funds in a lympay vault until every promise is kept, ensuring absolute transparency in every transaction.",
       content: () => (
         <View className="items-center justify-center w-full aspect-square relative">
           {/* Main Vault Image Area */}
@@ -86,7 +87,7 @@ export default function OnboardingScreen() {
                   variant="caption"
                   className="text-[#43E5B1] font-inter-medium"
                 >
-                  Secured by LymePay Protocol
+                  Secured by LymPay Protocol
                 </Typography>
               </View>
             </View>
@@ -260,17 +261,11 @@ export default function OnboardingScreen() {
 
       {/* Dynamic Header */}
       <View className="flex-row items-center justify-between px-6 pt-12 pb-4">
-        <View className="flex-row items-center space-x-2">
-          <View className="w-8 h-8 bg-[#F5E642] rounded-lg items-center justify-center">
-            <Ionicons name="shield-checkmark" size={18} color="#0D1117" />
-          </View>
-          <Typography
-            variant="heading"
-            className="text-[#F5E642] font-inter-extrabold text-sm tracking-widest"
-          >
-            {currentIndex === 0 ? "LymePay" : "LymePay"}
-          </Typography>
-        </View>
+        <Image 
+          source={require('@/assets/Logos/png/lympay-white.png')}
+          style={{ width: 120, height: 40 }}
+          resizeMode="contain"
+        />
         <Typography
           variant="label-sm"
           className="text-[#8B949E] tracking-widest"
