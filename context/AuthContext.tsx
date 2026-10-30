@@ -204,6 +204,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const publicRoutes = ["login", "register", "verify-otp", "pin-login"];
     const currentRoute = segments[segments.length - 1];
     const isPublic = publicRoutes.includes(currentRoute) || inOnboarding;
+    // Open to everyone, logged in or not (no redirect either way).
+    const openRoutes = ["verify"];
+    if (openRoutes.includes(rootSegment)) return;
 
     console.log(
       `[AUTH-GUARD] Path: ${pathname}, Auth: ${isAuthenticated}, Launched: ${hasLaunched}, PinSetup: ${hasPinSetup}`,

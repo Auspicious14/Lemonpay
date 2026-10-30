@@ -1,348 +1,602 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   ScrollView,
   TouchableOpacity,
+  Text,
+  TextInput,
   Image,
+  Linking,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import {
-  ArrowLeft,
+  Gavel,
+  Paperclip,
+  Send,
+  X,
   Clock,
-  MessageSquare,
+  Scale,
+  CheckCircle2,
+  Handshake,
+  RotateCcw,
+  Truck,
+  Banknote,
   FileText,
-  Headset,
-  Eye,
-  Plus,
 } from "lucide-react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { Screen } from "@/components/ui/Screen";
-import { Typography } from "@/components/ui/Typography";
-import { useDisputeDetail, useCreateSupportTicket } from "@/lib/hooks/useDisputes";
+import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useAuth } from "@/context/AuthContext";
+import {
+  useDisputeDetail,
+  useSendDisputeMessage,
+  useProposeOutcome,
+  useAcceptProposal,
+  useRejectProposal,
+  useEscalateDispute,
+  PickedFile,
+} from "@/lib/hooks/useDisputes";
+import { useEscrowDetail } from "@/lib/hooks/useEscrow";
+import { getUserRole, formatTimeLeft } from "@/lib/utils/escrow";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { formatCurrency, formatDate, formatRelativeTime } from "@/lib/utils/format";
 import { useToastStore } from "@/store/useToastStore";
+import { useDialogStore } from "@/store/useDialogStore";
+import { C, Card, Notice, SectionLabel, Sheet, OutlineButton, inputStyle } from "@/components/escrow/ui";
+import { DisputeMessage, DisputeOutcome, DisputeProposal, EscrowRole } from "@/types/api";
 
-const LEMON_YELLOW = "#F5E642";
-const DARK_BG = "#161B22";
-const CARD_BG = "#161B22";
-const BORDER_COLOR = "#30363D";
-const TEAL = "#00C896";
+const REASON_LABELS: Record<string, string> = {
+  not_received: "Item not received",
+  wrong_item: "Wrong item / not as described",
+  damaged_item: "Arrived damaged",
+  buyer_unresponsive: "Buyer not responding",
+  false_non_delivery_claim: "False non-delivery claim",
+  other: "Other",
+};
+
+/** How an outcome reads depending on who's looking. */
+const outcomeText = (outcome: DisputeOutcome, amount: number | null, viewer: EscrowRole | null) => {
+  const amt = amount ? formatCurrency(amount) : "";
+  switch (outcome) {
+    case "full_refund":
+      return viewer === "buyer" ? "Full refund to you" : viewer === "seller" ? "Full refund to the buyer" : "Full refund";
+    case "partial_refund":
+      return viewer === "buyer" ? `${amt} back to you, the rest to the seller` : `${amt} back to the buyer, the rest to ${viewer === "seller" ? "you" : "the seller"}`;
+    case "redeliver":
+      return "Seller sends a replacement (new delivery deadline)";
+    case "release":
+      return viewer === "seller" ? "Full payment released to you" : "Full payment released to the seller";
+  }
+};
+
+const OFFER_OPTIONS: Record<EscrowRole, { outcome: DisputeOutcome; label: string; sub: string; icon: any }[]> = {
+  buyer: [
+    { outcome: "full_refund", label: "Ask for a full refund", sub: "All the money back to you", icon: RotateCcw },
+    { outcome: "partial_refund", label: "Ask for a partial refund", sub: "Keep the item, get some money back", icon: Banknote },
+    { outcome: "redeliver", label: "Ask for a replacement", sub: "Seller delivers again", icon: Truck },
+    { outcome: "release", label: "Release payment to seller", sub: "Withdraw your complaint", icon: Handshake },
+  ],
+  seller: [
+    { outcome: "full_refund", label: "Give a full refund", sub: "All the money goes back to the buyer", icon: RotateCcw },
+    { outcome: "partial_refund", label: "Give a partial refund", sub: "Buyer gets some money back, you get the rest", icon: Banknote },
+    { outcome: "redeliver", label: "Send a replacement", sub: "You deliver again with a new deadline", icon: Truck },
+    { outcome: "release", label: "Ask buyer to release payment", sub: "If you delivered as agreed", icon: Handshake },
+  ],
+};
+
+const isImage = (url?: string, type?: string) =>
+  (type ?? "").startsWith("image") || /\.(jpe?g|png|gif|webp|heic)(\?|$)/i.test(url ?? "");
 
 export default function DisputeDetailScreen() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
+  const id = uuid || "";
   const router = useRouter();
-  const { show: showToast } = useToastStore();
+  const { user } = useAuth();
+  const showToast = useToastStore((s) => s.show);
+  const showDialog = useDialogStore((s) => s.show);
 
-  const { data: dispute, isLoading } = useDisputeDetail(uuid || "");
-  const createSupportTicketMutation = useCreateSupportTicket();
+  const { data: dispute, isLoading, refetch, isRefetching, error } = useDisputeDetail(id, { refetchInterval: 15000 });
+  const escrowUuid = dispute?.escrow_uuid ?? dispute?.escrow?.uuid ?? "";
+  const { data: escrow } = useEscrowDetail(escrowUuid);
 
-  const handleContactSupport = async () => {
-    try {
-      await createSupportTicketMutation.mutateAsync({
-        subject: `Support for Case #${uuid?.substring(0, 8).toUpperCase()}`,
-        description: `I need help with my dispute case ${uuid}`,
-      });
-      showToast("Support ticket created. We'll get back to you soon.", "success");
-    } catch (error) {
-      showToast("Failed to contact support", "error");
-    }
-  };
+  const sendMessage = useSendDisputeMessage(id);
+  const propose = useProposeOutcome(id);
+  const acceptProposal = useAcceptProposal(id);
+  const rejectProposal = useRejectProposal(id);
+  const escalate = useEscalateDispute(id);
 
-  if (isLoading || !dispute) {
+  const [draft, setDraft] = useState("");
+  const [files, setFiles] = useState<(PickedFile & { preview: string })[]>([]);
+  const [offerSheet, setOfferSheet] = useState(false);
+  const [offerOutcome, setOfferOutcome] = useState<DisputeOutcome | null>(null);
+  const [offerAmount, setOfferAmount] = useState("");
+  const [offerNote, setOfferNote] = useState("");
+
+  const myRole: EscrowRole | null = escrow ? getUserRole(escrow, user?.id || "") : null;
+  const escrowAmount = parseFloat(String(escrow?.amount ?? dispute?.escrow?.amount ?? "0"));
+
+  const pendingProposal: DisputeProposal | undefined = useMemo(
+    () => (dispute?.proposals ?? []).find((p) => (p.status ?? "pending") === "pending"),
+    [dispute?.proposals],
+  );
+  const proposerId = pendingProposal?.proposed_by ?? pendingProposal?.user_id;
+  const proposerRole = pendingProposal?.proposed_by_role ?? pendingProposal?.role;
+  const proposalIsMine = !!pendingProposal && (proposerId ? proposerId === user?.id : !!myRole && proposerRole === myRole);
+
+  if (isLoading) {
     return (
-      <Screen>
-        <View className="flex-1 items-center justify-center">
+      <Screen showBackButton title="Dispute">
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <LoadingSpinner />
         </View>
       </Screen>
     );
   }
+  if (!dispute) {
+    return (
+      <Screen showBackButton title="Dispute">
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Text style={{ fontFamily: "Inter", color: C.muted, textAlign: "center" }}>
+            {getApiErrorMessage(error, "Couldn't load this dispute.")}
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
 
-  const caseId = `#${dispute.uuid.substring(0, 8).toUpperCase()}`;
-  const formattedDate = new Date(dispute.created_at).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  // ─── Support tickets: no money, just the ticket ────────────────────────────
+  if (dispute.type === "support") {
+    return (
+      <Screen showBackButton title="Support Ticket">
+        <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }}>
+          <Text style={{ fontFamily: "Inter-Bold", color: C.muted, fontSize: 10, letterSpacing: 1.5 }}>
+            #{dispute.uuid.substring(0, 8).toUpperCase()} · {String(dispute.status).toUpperCase()}
+          </Text>
+          <Card>
+            <Text style={{ fontFamily: "Inter", color: "white", fontSize: 14, lineHeight: 21 }}>{dispute.description}</Text>
+          </Card>
+          {(dispute.admin_notes || dispute.resolution_notes) && (
+            <Notice icon={<CheckCircle2 size={16} color={C.teal} />} color={C.teal} title="LymPay replied">
+              {dispute.admin_notes || dispute.resolution_notes || ""}
+            </Notice>
+          )}
+        </ScrollView>
+      </Screen>
+    );
+  }
 
-  const stages = [
-    { 
-      id: 1, 
-      label: "Dispute Raised", 
-      subtext: "Case successfully registered in the system.",
-      status: "completed" 
-    },
-    { 
-      id: 2, 
-      label: "Review Started", 
-      subtext: "Assigned to a LymPay specialist.",
-      status: ["under_review", "evidence_review", "resolved"].includes(dispute.status) ? "completed" : "pending"
-    },
-    { 
-      id: 3, 
-      label: "Evidence Review", 
-      subtext: "Currently analyzing documents and chat logs.",
-      status: dispute.status === "evidence_review" ? "active" : (dispute.status === "resolved" ? "completed" : "pending")
-    },
-    { 
-      id: 4, 
-      label: "Resolution", 
-      subtext: "Final decision will be communicated.",
-      status: dispute.status === "resolved" ? "completed" : "pending"
-    },
-  ];
+  const stage = dispute.stage ?? (dispute.status === "resolved" ? "closed" : "settle");
+  const isClosed = stage === "closed";
+  const settleLeft = formatTimeLeft(dispute.settle_deadline);
+  const otherSide = myRole === "buyer" ? "seller" : "buyer";
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
+  const pickFiles = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      showToast("Allow photo access to attach evidence", "warning");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+      quality: 0.7,
+    });
+    if (!result.canceled) {
+      setFiles((prev) =>
+        [
+          ...prev,
+          ...result.assets.map((a) => ({
+            uri: a.uri,
+            preview: a.uri,
+            mimeType: a.mimeType ?? (a.type === "video" ? "video/mp4" : "image/jpeg"),
+            fileName: a.fileName ?? undefined,
+          })),
+        ].slice(0, 5),
+      );
+    }
+  };
+
+  const handleSend = async () => {
+    const body = draft.trim() || (files.length ? "Evidence attached" : "");
+    if (!body) return;
+    try {
+      await sendMessage.mutateAsync({ body, attachments: files });
+      setDraft("");
+      setFiles([]);
+    } catch (e: any) {
+      showToast(getApiErrorMessage(e, "Message not sent"), "error");
+    }
+  };
+
+  const submitOffer = async () => {
+    if (!offerOutcome) return;
+    const refund = parseInt(offerAmount || "0", 10);
+    if (offerOutcome === "partial_refund" && (!refund || refund <= 0 || refund >= escrowAmount)) {
+      showToast(`Enter an amount between ₦1 and ${formatCurrency(escrowAmount - 1)}`, "warning");
+      return;
+    }
+    try {
+      await propose.mutateAsync({
+        outcome: offerOutcome,
+        ...(offerOutcome === "partial_refund" ? { refund_amount: refund } : {}),
+        ...(offerNote.trim() ? { note: offerNote.trim() } : {}),
+      });
+      setOfferSheet(false);
+      showToast(`Offer sent. If the ${otherSide} accepts, the money moves straight away.`, "success");
+    } catch (e: any) {
+      showToast(getApiErrorMessage(e, "Couldn't send the offer"), "error");
+    }
+  };
+
+  const handleAccept = (p: DisputeProposal) =>
+    showDialog({
+      title: "Accept this offer?",
+      message: `${outcomeText(p.outcome, p.refund_amount ? Number(p.refund_amount) : null, myRole)}. The money moves immediately and the dispute closes. This can't be undone.`,
+      confirmLabel: "Accept Offer",
+      onConfirm: async () => {
+        try {
+          await acceptProposal.mutateAsync(p.uuid);
+          showToast("Offer accepted. The dispute is settled.", "success");
+        } catch (e: any) {
+          showToast(getApiErrorMessage(e, "Couldn't accept the offer"), "error");
+        }
+      },
+    });
+
+  const handleReject = (p: DisputeProposal) =>
+    showDialog({
+      title: "Decline this offer?",
+      message: "You can keep talking or make your own offer. Declining also lets either of you ask a LymPay mediator to decide.",
+      confirmLabel: "Decline",
+      onConfirm: async () => {
+        try {
+          await rejectProposal.mutateAsync(p.uuid);
+          showToast("Offer declined", "success");
+        } catch (e: any) {
+          showToast(getApiErrorMessage(e, "Couldn't decline the offer"), "error");
+        }
+      },
+    });
+
+  const handleEscalate = () =>
+    showDialog({
+      title: "Ask a LymPay mediator?",
+      message: "A mediator will review the conversation and evidence and decide how the money is split. You can still settle between yourselves until then.",
+      confirmLabel: "Escalate",
+      onConfirm: async () => {
+        try {
+          await escalate.mutateAsync();
+          showToast("Sent to a LymPay mediator", "success");
+        } catch (e: any) {
+          showToast(getApiErrorMessage(e, "Try settling first"), "error");
+        }
+      },
+    });
+
+  // ─── Stage header ──────────────────────────────────────────────────────────
+  const stageInfo = isClosed
+    ? {
+        icon: <CheckCircle2 size={22} color={C.teal} />,
+        title: "Settled",
+        sub: dispute.outcome
+          ? outcomeText(dispute.outcome, dispute.refund_amount ? Number(dispute.refund_amount) : null, myRole)
+          : dispute.resolution_notes || dispute.admin_notes || "This dispute is closed.",
+        color: C.teal,
+      }
+    : stage === "mediation"
+      ? {
+          icon: <Scale size={22} color={C.blue} />,
+          title: "With a LymPay mediator",
+          sub: "A mediator is reviewing the evidence and will decide. You can still settle between yourselves until then.",
+          color: C.blue,
+        }
+      : {
+          icon: <Clock size={22} color={C.yellow} />,
+          title: "Try to settle it together",
+          sub: `Talk it through and make an offer. ${settleLeft && settleLeft !== "passed" ? `${settleLeft} before a LymPay mediator can step in.` : "A LymPay mediator can now step in if you can't agree."}`,
+          color: C.yellow,
+        };
+
+  const senderLabel = (m: DisputeMessage) => {
+    const senderId = m.sender_id ?? m.user_id ?? m.sender?.id ?? null;
+    const role = m.sender_role ?? m.role ?? m.sender?.role ?? null;
+    if (senderId && senderId === user?.id) return "You";
+    if (!senderId && role && role === myRole) return "You";
+    if (role === "admin") return "LymPay mediator";
+    if (role === "buyer") return "Buyer";
+    if (role === "seller") return "Seller";
+    return "Message";
+  };
+
+  const offerOptions = myRole ? OFFER_OPTIONS[myRole] : [];
 
   return (
-    <Screen>
-      <View className="px-4 py-2">
-        <TouchableOpacity 
-          onPress={() => router.back()}
-          className="flex-row items-center"
+    <Screen showBackButton title="Dispute" onBack={() => router.back()}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }} keyboardVerticalOffset={90}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 24, gap: 20 }}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={C.yellow} />}
         >
-          <ArrowLeft size={20} color={LEMON_YELLOW} />
-          <Typography 
-            style={{ fontFamily: "Inter-Bold" }}
-            className="text-[#F5E642] ml-2 text-sm"
-          >
-            Dispute Center
-          </Typography>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView 
-        className="flex-1 px-4"
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Status Badge */}
-        <View className="mt-4 self-start">
-          <View 
-            style={{ backgroundColor: "#2D3018", borderColor: LEMON_YELLOW, borderWidth: 1 }}
-            className="px-3 py-1 rounded-full"
-          >
-            <Typography 
-              style={{ fontFamily: "Inter-Bold" }}
-              className="text-[#F5E642] text-[10px] uppercase tracking-wider"
-            >
-              {dispute.status.replace("_", " ").toUpperCase()}
-            </Typography>
-          </View>
-        </View>
-
-        {/* Case Info */}
-        <View className="mt-4">
-          <Typography 
-            style={{ fontFamily: "Inter-ExtraBold" }}
-            className="text-white text-3xl"
-          >
-            {caseId}
-          </Typography>
-          <Typography 
-            style={{ fontFamily: "Inter" }}
-            className="text-gray-500 text-sm mt-1"
-          >
-            Case opened on {formattedDate}
-          </Typography>
-        </View>
-
-        {/* Est Resolution Card */}
-        <View 
-          style={{ backgroundColor: CARD_BG }}
-          className="mt-6 p-4 rounded-2xl flex-row items-center border border-[#30363D]"
-        >
-          <View className="bg-[#21262D] p-3 rounded-xl">
-            <Clock size={24} color={LEMON_YELLOW} />
-          </View>
-          <View className="ml-4">
-            <Typography 
-              style={{ fontFamily: "Inter-Bold" }}
-              className="text-gray-500 text-[10px] uppercase tracking-widest"
-            >
-              Est. Resolution
-            </Typography>
-            <Typography 
-              style={{ fontFamily: "Inter-Bold" }}
-              className="text-white text-xl"
-            >
-              24-48 hours
-            </Typography>
-          </View>
-        </View>
-
-        {/* Progress Section */}
-        <View className="mt-8">
-          <Typography 
-            style={{ fontFamily: "Inter-Bold" }}
-            className="text-gray-500 text-[10px] uppercase tracking-widest mb-6"
-          >
-            Dispute Progress
-          </Typography>
-
-          {stages.map((stage, index) => (
-            <View key={stage.id} className="flex-row mb-6 last:mb-0">
-              <View className="items-center mr-4">
-                <View 
-                  className={`w-6 h-6 rounded-full items-center justify-center ${
-                    stage.status === "completed" ? "bg-[#00C896]" : 
-                    stage.status === "active" ? "border-2 border-[#F5E642]" : 
-                    "border-2 border-gray-700"
-                  }`}
-                >
-                  {stage.status === "completed" && <View className="w-2 h-2 bg-white rounded-full" />}
-                  {stage.status === "active" && <View className="w-2 h-2 bg-[#F5E642] rounded-full" />}
-                </View>
-                {index < stages.length - 1 && (
-                  <View 
-                    style={{ 
-                      borderStyle: stage.status === "completed" ? "solid" : "dashed",
-                      borderColor: stage.status === "completed" ? TEAL : "#30363D",
-                      borderWidth: 1,
-                    }}
-                    className="w-0.5 flex-1 mt-1"
-                  />
-                )}
-              </View>
-              <View className="flex-1 pb-4">
-                <Typography 
-                  style={{ fontFamily: "Inter-Bold" }}
-                  className={`text-base ${
-                    stage.status === "completed" ? "text-white" : 
-                    stage.status === "active" ? "text-[#F5E642]" : 
-                    "text-gray-600"
-                  }`}
-                >
-                  {stage.label}
-                </Typography>
-                <Typography 
-                  style={{ fontFamily: "Inter" }}
-                  className={`text-xs mt-1 ${stage.status === "pending" ? "text-gray-700" : "text-gray-500"}`}
-                >
-                  {stage.subtext}
-                </Typography>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Status Update Card */}
-        <View 
-          style={{ backgroundColor: CARD_BG }}
-          className="mt-4 p-4 rounded-2xl border border-[#30363D]"
-        >
-          <View className="flex-row items-center mb-3">
-            <View className="bg-[#21262D] p-2 rounded-lg">
-              <MessageSquare size={18} color={LEMON_YELLOW} />
-            </View>
-            <Typography 
-              style={{ fontFamily: "Inter-Bold" }}
-              className="text-white text-base ml-3"
-            >
-              Status Update
-            </Typography>
-          </View>
-          <Typography 
-            style={{ fontFamily: "Inter" }}
-            className="text-gray-400 text-sm leading-5"
-          >
-            {dispute.resolution_notes || "Our team of specialists is currently reviewing your case. We are cross-referencing the transaction data with the evidence provided. We will notify you if further information is needed."}
-          </Typography>
-        </View>
-
-        {/* Quick Actions */}
-        <View 
-          style={{ backgroundColor: CARD_BG }}
-          className="mt-6 p-4 rounded-2xl border border-[#30363D]"
-        >
-          <Typography 
-            style={{ fontFamily: "Inter-Bold" }}
-            className="text-white text-base mb-4"
-          >
-            Quick Actions
-          </Typography>
-
-          <TouchableOpacity
-            onPress={() => router.push(`/disputes/${uuid}/evidence`)}
-          >
-            <LinearGradient
-              colors={["#F5E642", "#D9CC3B"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              className="h-12 rounded-xl flex-row items-center justify-center"
-            >
-              <FileText size={18} color="black" />
-              <Typography 
-                style={{ fontFamily: "Inter-Bold" }}
-                className="text-black ml-2"
-              >
-                Add More Evidence
-              </Typography>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleContactSupport}
-            disabled={createSupportTicketMutation.isPending}
-            style={{ backgroundColor: "transparent", borderColor: BORDER_COLOR, borderWidth: 1 }}
-            className="h-12 rounded-xl flex-row items-center justify-center mt-3"
-          >
-            <Headset size={18} color="white" />
-            <Typography 
-              style={{ fontFamily: "Inter-Bold" }}
-              className="text-white ml-2"
-            >
-              {createSupportTicketMutation.isPending ? "Creating..." : "Contact Support"}
-            </Typography>
-          </TouchableOpacity>
-        </View>
-
-        {/* Files Attached Section */}
-        <View className="mt-8">
-          <Typography 
-            style={{ fontFamily: "Inter-Bold" }}
-            className="text-gray-500 text-[10px] uppercase tracking-widest mb-4"
-          >
-            Files Attached
-          </Typography>
-
-          <View className="flex-row flex-wrap gap-2">
-            {dispute.attachments?.map((file: any, index: number) => (
-              <View 
-                key={index}
-                style={{ backgroundColor: CARD_BG, width: "48%" }}
-                className="h-[100px] rounded-2xl border border-[#30363D] items-center justify-center overflow-hidden"
-              >
-                {file.url ? (
-                  <Image source={{ uri: file.url }} className="w-full h-full" />
-                ) : (
-                  <Eye size={24} color="#8B949E" style={{ opacity: 0.5 }} />
-                )}
-              </View>
-            ))}
-            
-            {(!dispute.attachments || dispute.attachments.length === 0) && (
-              <View 
-                style={{ backgroundColor: CARD_BG, width: "48%" }}
-                className="h-[100px] rounded-2xl border border-[#30363D] items-center justify-center"
-              >
-                <Eye size={24} color="#8B949E" style={{ opacity: 0.5 }} />
-              </View>
+          {/* Case header */}
+          <View>
+            <Text style={{ fontFamily: "Inter-Bold", color: C.muted, fontSize: 10, letterSpacing: 1.5, marginBottom: 4 }}>
+              CASE #{dispute.uuid.substring(0, 8).toUpperCase()}
+              {dispute.opened_by_role ? ` · OPENED BY ${dispute.opened_by_role === myRole ? "YOU" : dispute.opened_by_role.toUpperCase()}` : ""}
+            </Text>
+            <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 20 }}>
+              {REASON_LABELS[dispute.reason ?? ""] ?? "Dispute"}
+            </Text>
+            {escrow && (
+              <TouchableOpacity onPress={() => router.push(`/escrow/${escrow.uuid}`)}>
+                <Text style={{ fontFamily: "Inter", color: C.muted, fontSize: 13, marginTop: 4 }}>
+                  {escrow.title} · <Text style={{ color: C.yellow, fontFamily: "Inter-Bold" }}>{formatCurrency(escrow.amount)}</Text>
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
 
-          <TouchableOpacity
-            onPress={() => router.push(`/disputes/${uuid}/evidence`)}
-            className="mt-4 flex-row items-center justify-center"
-          >
-            <Plus size={16} color="#8B949E" />
-            <Typography 
-              style={{ fontFamily: "Inter-Bold" }}
-              className="text-gray-500 ml-1 text-sm uppercase tracking-widest"
-            >
-              Add File
-            </Typography>
-          </TouchableOpacity>
+          <Card style={{ flexDirection: "row", gap: 14, alignItems: "center", borderColor: stageInfo.color + "40", backgroundColor: stageInfo.color + "10" }}>
+            {stageInfo.icon}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: "Inter-Bold", color: stageInfo.color, fontSize: 15, marginBottom: 3 }}>{stageInfo.title}</Text>
+              <Text style={{ fontFamily: "Inter", color: C.muted, fontSize: 12, lineHeight: 18 }}>{stageInfo.sub}</Text>
+            </View>
+          </Card>
+
+          {/* Offer on the table */}
+          {!isClosed && pendingProposal && (
+            <Card style={{ gap: 12, borderColor: C.yellow + "50" }}>
+              <SectionLabel>{proposalIsMine ? "YOUR OFFER" : `${otherSide.toUpperCase()}'S OFFER`}</SectionLabel>
+              <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 16 }}>
+                {outcomeText(pendingProposal.outcome, pendingProposal.refund_amount ? Number(pendingProposal.refund_amount) : null, myRole)}
+              </Text>
+              {pendingProposal.note ? (
+                <Text style={{ fontFamily: "Inter", color: C.muted, fontSize: 13, lineHeight: 19 }}>"{pendingProposal.note}"</Text>
+              ) : null}
+              {proposalIsMine ? (
+                <Text style={{ fontFamily: "Inter", color: C.muted, fontSize: 12 }}>
+                  Waiting for the {otherSide} to respond. Making a new offer replaces this one.
+                </Text>
+              ) : (
+                <View style={{ flexDirection: "row", gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      variant="primary"
+                      label="ACCEPT"
+                      textClassName="!text-black !font-inter-bold"
+                      onPress={() => handleAccept(pendingProposal)}
+                      loading={acceptProposal.isPending}
+                      disabled={acceptProposal.isPending || rejectProposal.isPending}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <OutlineButton
+                      label="DECLINE"
+                      color={C.muted}
+                      onPress={() => handleReject(pendingProposal)}
+                      disabled={acceptProposal.isPending || rejectProposal.isPending}
+                    />
+                  </View>
+                </View>
+              )}
+            </Card>
+          )}
+
+          {!isClosed && myRole && (
+            <View style={{ gap: 10 }}>
+              <OutlineButton label={pendingProposal ? "MAKE A DIFFERENT OFFER" : "MAKE AN OFFER"} icon={<Handshake size={16} color={C.yellow} />} onPress={() => {
+                setOfferOutcome(null);
+                setOfferAmount("");
+                setOfferNote("");
+                setOfferSheet(true);
+              }} />
+              {stage === "settle" && dispute.can_escalate && (
+                <OutlineButton label="ASK A LYMPAY MEDIATOR" color={C.blue} icon={<Gavel size={16} color={C.blue} />} onPress={handleEscalate} disabled={escalate.isPending} />
+              )}
+            </View>
+          )}
+
+          {/* Conversation */}
+          <View style={{ gap: 12 }}>
+            <SectionLabel>CONVERSATION</SectionLabel>
+            {(dispute.messages ?? []).length === 0 && (
+              <Text style={{ fontFamily: "Inter", color: C.muted, fontSize: 13 }}>No messages yet.</Text>
+            )}
+            {(dispute.messages ?? []).map((m, i) => {
+              if (m.type === "system" || m.type === "proposal") {
+                return (
+                  <View key={m.uuid ?? i} style={{ alignItems: "center", paddingVertical: 4 }}>
+                    <Text style={{ fontFamily: "Inter", color: C.muted, fontSize: 12, textAlign: "center", fontStyle: "italic" }}>
+                      {m.body}
+                      {m.created_at ? ` · ${formatRelativeTime(m.created_at)}` : ""}
+                    </Text>
+                  </View>
+                );
+              }
+              const label = senderLabel(m);
+              const mine = label === "You";
+              return (
+                <View key={m.uuid ?? i} style={{ alignItems: mine ? "flex-end" : "flex-start" }}>
+                  <View
+                    style={{
+                      maxWidth: "85%",
+                      backgroundColor: mine ? C.yellow + "15" : C.card,
+                      borderWidth: 1,
+                      borderColor: mine ? C.yellow + "40" : C.border,
+                      borderRadius: 14,
+                      padding: 12,
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={{ fontFamily: "Inter-Bold", color: mine ? C.yellow : C.muted, fontSize: 10, letterSpacing: 1 }}>
+                      {label.toUpperCase()}
+                      {m.created_at ? ` · ${formatRelativeTime(m.created_at)}` : ""}
+                    </Text>
+                    <Text style={{ fontFamily: "Inter", color: "white", fontSize: 14, lineHeight: 20 }}>{m.body}</Text>
+                    {(m.attachments ?? []).length > 0 && (
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                        {(m.attachments ?? []).map((a, j) => (
+                          <TouchableOpacity key={j} onPress={() => Linking.openURL(a.url)}>
+                            {isImage(a.url, a.type) ? (
+                              <Image source={{ uri: a.url }} style={{ width: 72, height: 72, borderRadius: 8, backgroundColor: "#21262D" }} />
+                            ) : (
+                              <View style={{ width: 72, height: 72, borderRadius: 8, backgroundColor: "#21262D", alignItems: "center", justifyContent: "center" }}>
+                                <FileText size={22} color={C.muted} />
+                                <Text style={{ fontFamily: "Inter", color: C.muted, fontSize: 9, marginTop: 4 }}>Open</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Past offers */}
+          {(dispute.proposals ?? []).filter((p) => p.status && p.status !== "pending").length > 0 && (
+            <View style={{ gap: 8 }}>
+              <SectionLabel>PAST OFFERS</SectionLabel>
+              {(dispute.proposals ?? [])
+                .filter((p) => p.status && p.status !== "pending")
+                .map((p) => (
+                  <Text key={p.uuid} style={{ fontFamily: "Inter", color: C.muted, fontSize: 12 }}>
+                    {outcomeText(p.outcome, p.refund_amount ? Number(p.refund_amount) : null, myRole)} — {p.status}
+                    {p.created_at ? ` · ${formatDate(p.created_at)}` : ""}
+                  </Text>
+                ))}
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Composer */}
+        {!isClosed && myRole && (
+          <View style={{ borderTopWidth: 1, borderTopColor: C.border, padding: 12, backgroundColor: C.bg, gap: 8 }}>
+            {files.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {files.map((f, i) => (
+                  <View key={i} style={{ marginRight: 8 }}>
+                    <Image source={{ uri: f.preview }} style={{ width: 52, height: 52, borderRadius: 8, backgroundColor: "#21262D" }} />
+                    <TouchableOpacity
+                      onPress={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                      style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#000a", borderRadius: 10, padding: 3 }}
+                    >
+                      <X size={10} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
+              <TouchableOpacity onPress={pickFiles} style={{ padding: 10 }}>
+                <Paperclip size={20} color={C.muted} />
+              </TouchableOpacity>
+              <TextInput
+                value={draft}
+                onChangeText={setDraft}
+                placeholder={`Message the ${otherSide}${stage === "mediation" ? " and mediator" : ""}...`}
+                placeholderTextColor={C.faint}
+                multiline
+                style={{ ...inputStyle, flex: 1, paddingVertical: 10, maxHeight: 120 }}
+              />
+              <TouchableOpacity
+                onPress={handleSend}
+                disabled={sendMessage.isPending || (!draft.trim() && files.length === 0)}
+                style={{
+                  backgroundColor: C.yellow,
+                  borderRadius: 20,
+                  width: 40,
+                  height: 40,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: sendMessage.isPending || (!draft.trim() && files.length === 0) ? 0.4 : 1,
+                }}
+              >
+                <Send size={18} color={C.bg} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+
+      {/* Make an offer */}
+      <Sheet visible={offerSheet} onClose={() => setOfferSheet(false)} title="Make an offer">
+        <Text style={{ fontFamily: "Inter", color: C.muted, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
+          If the {otherSide} accepts, the money moves straight away and the dispute closes.
+        </Text>
+        <View style={{ gap: 8, marginBottom: 16 }}>
+          {offerOptions.map((o) => {
+            const active = offerOutcome === o.outcome;
+            return (
+              <TouchableOpacity
+                key={o.outcome}
+                onPress={() => setOfferOutcome(o.outcome)}
+                style={{
+                  flexDirection: "row",
+                  gap: 12,
+                  alignItems: "center",
+                  padding: 14,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: active ? C.yellow : C.border,
+                  backgroundColor: active ? C.yellow + "10" : C.input,
+                }}
+              >
+                <o.icon size={20} color={active ? C.yellow : C.muted} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 14 }}>{o.label}</Text>
+                  <Text style={{ fontFamily: "Inter", color: C.muted, fontSize: 12, marginTop: 2 }}>{o.sub}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </ScrollView>
+
+        {offerOutcome === "partial_refund" && (
+          <View style={{ marginBottom: 14 }}>
+            <Text style={{ fontFamily: "Inter-Bold", color: C.muted, fontSize: 10, letterSpacing: 1.5, marginBottom: 6 }}>
+              AMOUNT BACK TO THE BUYER (OF {formatCurrency(escrowAmount)})
+            </Text>
+            <TextInput
+              keyboardType="number-pad"
+              value={offerAmount ? parseInt(offerAmount, 10).toLocaleString("en-NG") : ""}
+              onChangeText={(t) => setOfferAmount(t.replace(/[^0-9]/g, ""))}
+              placeholder="e.g. 50,000"
+              placeholderTextColor={C.faint}
+              style={inputStyle}
+            />
+          </View>
+        )}
+
+        {offerOutcome && (
+          <TextInput
+            value={offerNote}
+            onChangeText={setOfferNote}
+            placeholder="Add a note (optional)"
+            placeholderTextColor={C.faint}
+            multiline
+            style={{ ...inputStyle, minHeight: 70, textAlignVertical: "top", marginBottom: 16 }}
+          />
+        )}
+
+        <Button
+          variant="primary"
+          label="SEND OFFER"
+          textClassName="!text-black !font-inter-bold"
+          onPress={submitOffer}
+          loading={propose.isPending}
+          disabled={!offerOutcome || propose.isPending}
+        />
+      </Sheet>
     </Screen>
   );
 }

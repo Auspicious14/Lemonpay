@@ -15,6 +15,7 @@ import {
 } from "lucide-react-native";
 import { Screen } from "@/components/ui/Screen";
 import { Typography } from "@/components/ui/Typography";
+import { getApiErrorMessage } from "@/lib/api/errors";
 import { useWithdraw } from "@/lib/hooks/useBankAccount";
 import { useToastStore } from "@/store/useToastStore";
 import { LinearGradient } from "expo-linear-gradient";
@@ -52,7 +53,9 @@ export default function WithdrawReviewScreen() {
         },
       });
     } catch (error: any) {
-      showToast(error.response?.data?.message || "Withdrawal failed", "error");
+      // The hook re-throws 400s as a plain Error carrying the API's reason
+      // (24h holds, bank account not in your name, …).
+      showToast(getApiErrorMessage(error, "Withdrawal failed"), "error");
     }
   };
 

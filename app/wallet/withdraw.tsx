@@ -164,8 +164,8 @@ export default function WithdrawFundsScreen() {
     if (!selectedBankAccountId || !rawAmount) return;
 
     const numAmount = parseFloat(numericAmount);
-    if (numAmount < 100) {
-      showToast("Minimum withdrawal is ₦100.00", "error");
+    if (numAmount < 1000) {
+      showToast("Minimum withdrawal is ₦1,000.00", "error");
       return;
     }
     if (numAmount > balance) {
@@ -499,6 +499,11 @@ export default function WithdrawFundsScreen() {
                       </Typography>
                     </View>
                   </View>
+                )}
+                {verifiedName && (
+                  <Typography style={{ fontFamily: "Inter", fontSize: 12 }} className="text-[#8B949E] mt-2">
+                    Payouts only go to an account in your own name. Newly added accounts can receive withdrawals after 24 hours.
+                  </Typography>
                 )}
                 {/* NIBSS Note */}
                 <View className="flex-row items-center justify-center mt-2">

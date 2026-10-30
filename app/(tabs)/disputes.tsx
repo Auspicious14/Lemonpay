@@ -7,6 +7,7 @@ import { Typography } from "@/components/ui/Typography";
 import { Card } from "@/components/ui/Card";
 import { useDisputes } from "@/lib/hooks/useDisputes";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Dispute } from "@/types/api";
 
 const LEMON_YELLOW = "#F5E642";
 
@@ -14,13 +15,24 @@ export default function DisputesScreen() {
   const router = useRouter();
   const { data: disputes, isLoading, refetch } = useDisputes();
 
-  const renderDisputeItem = ({ item }: { item: any }) => {
+  const renderDisputeItem = ({ item }: { item: Dispute }) => {
     const caseId = `#${item.uuid.substring(0, 8).toUpperCase()}`;
-    
-    let statusColor = "#8B949E"; // Default gray
-    if (item.status === "resolved") statusColor = "#00C896"; // Teal
-    if (["open", "under_review", "evidence_review"].includes(item.status)) statusColor = LEMON_YELLOW;
-    if (item.status === "disputed") statusColor = "#FF4444"; // Red
+    const stage = item.type === "support" ? null : item.stage;
+
+    // settle = needs the parties, mediation = with LymPay, closed = done
+    let statusColor = "#8B949E";
+    let label = String(item.status ?? "").replace(/_/g, " ");
+    if (item.type === "support") label = `support · ${label}`;
+    else if (stage === "settle") {
+      statusColor = LEMON_YELLOW;
+      label = "settle";
+    } else if (stage === "mediation") {
+      statusColor = "#3b82f6";
+      label = "mediator";
+    } else if (stage === "closed" || item.status === "resolved") {
+      statusColor = "#00C896";
+      label = "settled";
+    }
 
     return (
       <TouchableOpacity
@@ -46,7 +58,9 @@ export default function DisputesScreen() {
                   style={{ fontFamily: "Inter" }}
                   className="text-gray-400 text-xs mt-0.5"
                 >
-                  {item.description || "No description provided"}
+                  {item.escrow?.title
+                    ? `${item.escrow.title} · ${item.description || ""}`
+                    : item.description || "No description provided"}
                 </Typography>
               </View>
             </View>
@@ -57,7 +71,7 @@ export default function DisputesScreen() {
                   style={{ fontFamily: "Inter-Bold" }}
                   className="text-[10px] text-gray-300 uppercase"
                 >
-                  {item.status.replace("_", " ")}
+                  {label}
                 </Typography>
               </View>
               <ChevronRight size={16} color="#8B949E" />
@@ -116,7 +130,7 @@ export default function DisputesScreen() {
               style={{ fontFamily: "Inter" }}
               className="text-gray-400 text-center mt-2"
             >
-              All your transactions are safe. Any disputes you raise will appear here.
+              If something goes wrong with a deal, report it from the escrow screen. It'll show up here.
             </Typography>
           </View>
         }

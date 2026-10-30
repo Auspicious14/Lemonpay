@@ -9,17 +9,17 @@ import { Escrow, EscrowStatus } from "@/types/api";
 //
 //   seller_terms     pending_seller_agreement      seller adds terms
 //   buyer_review     pending_buyer_confirmation    buyer: Accept & Pay, or counter
-//   seller_review    awaiting_seller_confirmation  buyer COUNTERED — seller: accept or counter
-//                    (pending_seller_confirmation is treated as the same thing)
+//                                                  (also an unclaimed seller payment link)
+//   seller_review    awaiting_seller_confirmation  buyer COUNTERED — seller: accept or reply
 //   awaiting_payment locked                        terms final — buyer pays
+//   payment_pending  pending_payment               checkout open (24h) — buyer pays
 //   payment_secured  funded                        money held — seller delivers
-//   delivered        awaiting_buyer_release        buyer confirms & releases, or reports a problem
+//   delivered        awaiting_buyer_release        72h inspection: buyer releases or reports,
+//                                                  else auto-release
 //   released / disputed / resolved / refunded
 //
-// Rule: whoever made the last offer is bound by it. The other party's
-// acceptance is final — when the buyer accepts the seller's terms the escrow
-// goes straight to `locked` (and the app pays immediately). The seller never
-// "accepts" again. See docs/escrow-api-contract.md for the backend side.
+// Rule (enforced by the API): whoever made the last offer is bound by it, so
+// only the other side can accept. See the LymPay Escrow v2 Postman collection.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type EscrowPhase =
@@ -27,6 +27,7 @@ export type EscrowPhase =
   | "buyer_review"
   | "seller_review"
   | "awaiting_payment"
+  | "payment_pending"
   | "payment_secured"
   | "delivered"
   | "released"
@@ -42,10 +43,12 @@ export const getEscrowPhase = (status: EscrowStatus | string): EscrowPhase => {
     case "pending_buyer_confirmation":
       return "buyer_review";
     case "awaiting_seller_confirmation":
-    case "pending_seller_confirmation":
+    case "pending_seller_confirmation": // legacy name, never returned by v2
       return "seller_review";
     case "locked":
       return "awaiting_payment";
+    case "pending_payment":
+      return "payment_pending";
     case "funded":
       return "payment_secured";
     case "awaiting_buyer_release":
@@ -73,6 +76,7 @@ export const isActiveEscrow = (status: EscrowStatus | string) => {
   return (
     isNegotiatingPhase(phase) ||
     phase === "awaiting_payment" ||
+    phase === "payment_pending" ||
     phase === "payment_secured" ||
     phase === "delivered" ||
     phase === "disputed"
@@ -90,6 +94,7 @@ export const getEscrowStepIndex = (status: EscrowStatus): number => {
     case "seller_review":
       return 0;
     case "awaiting_payment":
+    case "payment_pending":
       return 1;
     case "payment_secured":
     case "disputed":
@@ -106,12 +111,15 @@ export const getEscrowStepIndex = (status: EscrowStatus): number => {
 };
 
 /**
- * Determines if the current user is the buyer or seller
+ * Determines if the current user is the buyer or seller.
+ * Prefers the API's `my_role`; falls back to comparing ids.
  */
 export const getUserRole = (
   escrow: Escrow,
   userId: string,
 ): "buyer" | "seller" | null => {
+  if (escrow.my_role === "buyer" || escrow.my_role === "seller") return escrow.my_role;
+  if (escrow.my_role === null && escrow.buyer_id == null) return null; // unclaimed link
   if (escrow.buyer_id === userId) return "buyer";
   if (escrow.seller_id === userId) return "seller";
   return null;
@@ -136,7 +144,8 @@ export const getActionableStatus = (
       case "seller_review":
         return "Buyer sent a counter. Accept or counter";
       case "awaiting_payment":
-        return "Terms agreed. Waiting for buyer's payment — don't deliver yet";
+      case "payment_pending":
+        return "Buyer accepted. Waiting for payment — don't ship yet";
       case "payment_secured":
         return "Payment secured. Deliver, then notify the buyer";
       case "delivered":
@@ -160,6 +169,8 @@ export const getActionableStatus = (
         return "Counter sent. Waiting for seller";
       case "awaiting_payment":
         return "Terms agreed. Pay to secure the deal";
+      case "payment_pending":
+        return "Finish paying to secure the deal";
       case "payment_secured":
         return "Payment secured. Waiting for seller to deliver";
       case "delivered":
@@ -188,6 +199,7 @@ export const getStatusBadgeInfo = (status: EscrowStatus) => {
     case "seller_review":
       return { label: "COUNTER OFFER", color: "blue" };
     case "awaiting_payment":
+    case "payment_pending":
       return { label: "AWAITING PAYMENT", color: "purple" };
     case "payment_secured":
       return { label: "PAYMENT SECURED", color: "blue" };
@@ -204,4 +216,26 @@ export const getStatusBadgeInfo = (status: EscrowStatus) => {
     default:
       return { label: (status as string).toUpperCase(), color: "gray" };
   }
+};
+
+export const DELIVERY_TYPE_LABELS: Record<string, string> = {
+  physical: "Physical item",
+  service: "Service",
+  digital: "Digital",
+};
+
+/** Physical items finish with the buyer's 4-digit handover code. */
+export const usesHandoverCode = (escrow: Pick<Escrow, "delivery_type">) =>
+  (escrow.delivery_type ?? "physical") === "physical";
+
+/** "in 2 days", "in 5 hours", "overdue" — for deadlines. */
+export const formatTimeLeft = (iso?: string | null): string | null => {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  if (isNaN(ms)) return null;
+  if (ms <= 0) return "passed";
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours >= 48) return `${Math.floor(hours / 24)} days left`;
+  if (hours >= 1) return `${hours}h left`;
+  return `${Math.max(1, Math.floor(ms / 60_000))} min left`;
 };

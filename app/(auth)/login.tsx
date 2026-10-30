@@ -278,6 +278,16 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </Animated.View>
 
+          {/* Public anti-scam check — no login needed */}
+          <TouchableOpacity onPress={() => router.push("/verify")} style={styles.registerLink}>
+            <Typography variant="caption" className="!text-[#8B949E]">
+              Selling something?{" "}
+              <Typography variant="caption" className="!text-primary-fixed">
+                Check a payment code
+              </Typography>
+            </Typography>
+          </TouchableOpacity>
+
           {/* New account shortcut */}
           <TouchableOpacity
             onPress={() => router.push("/(auth)/register")}
