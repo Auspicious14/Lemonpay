@@ -1,0 +1,3536 @@
+{
+  "info": {
+    "name": "LymPay Escrow v2",
+    "description": "# LymPay Escrow v2 — API flow\n\nBearer-token API. Set **base_url**, then log in as two users (see *0. Setup*) so **buyer_token** and **seller_token** are filled. Test scripts save `escrow_uuid`, `payment_reference`, `verification_code`, `handover_code`, `dispute_uuid` and `proposal_uuid` as you go, so the folders can be run top to bottom.\n\nAll responses use the envelope `{ \"success\": bool, \"message\": string, \"data\": ... }`. Errors put details in `errors`.\n\n## Happy path (physical goods)\n\n```\nSeller: Create payment link ──► Buyer: Claim ──► Buyer: Accept & Pay (card / transfer / USSD)\n      ──► Paystack charge.success webhook ──► PAYMENT SECURED (funded)\n      ──► Buyer receives item, gives 4-digit handover code ──► Seller: Enter code ──► RELEASED\n```\n\nThe buyer can also start the deal (naming the seller). The two sides go back and forth with terms. **Whoever made the last offer is bound by it**, so only the other side can accept:\n\n- Seller's terms on the table → the buyer accepts (`accept-and-pay`, or `confirm-agreement` then `fund`).\n- Buyer's counter on the table → the seller accepts (`confirm-agreement`) or replies with new terms.\n\n## Statuses\n\n| status | meaning | who acts next |\n|---|---|---|\n| `pending_seller_agreement` | buyer created the deal | seller: add terms |\n| `pending_buyer_confirmation` | seller's terms on the table (or seller payment link) | buyer: accept & pay, or counter |\n| `awaiting_seller_confirmation` | **buyer sent a counter-offer** (only this) | seller: accept it, or reply with new terms |\n| `locked` | terms agreed, not yet paid | buyer: pay (`fund` or `accept-and-pay`) |\n| `pending_payment` | buyer accepted, checkout open (expires after 24h → back to `pending_buyer_confirmation`) | buyer: pay |\n| `funded` | **Payment Secured.** Handover code issued, delivery deadline running | seller: deliver |\n| `awaiting_buyer_release` | seller marked delivered, inspection window running (72h) | buyer: confirm or raise issue, else auto-release |\n| `disputed` | dispute open (settle stage, then mediation) | both parties / mediator |\n| `released` | seller paid | — |\n| `refunded` | buyer refunded in full | — |\n| `resolved` | dispute split (partial refund) | — |\n\n`pending_seller_confirmation` is never returned.\n\n## Errors\n\nEvery action checks **both** the caller's role and the current status.\n\n| HTTP | When |\n|---|---|\n| `409` | wrong party, or the action isn't allowed in the current status. `message` is user-readable, e.g. *\"You made the last offer, so the buyer has to accept it.\"* |\n| `404` | no escrow with that uuid |\n| `422` | validation error, or a wrong handover code |\n| `400` | anything else, e.g. insufficient wallet balance |\n\nDispute endpoints are separate: they return `403` for permission and stage errors (e.g. accepting your own offer, escalating too early).\n\n**Safe to repeat** (double taps return `200` with the escrow as it is, nothing moves twice): `confirm-agreement` once locked, `fund` / `accept-and-pay` once paid, `mark-delivered` once marked, `confirm-delivery` once released, `claim` by the same buyer.\n\n## Timers (defaults, configurable in .env)\n\n| Timer | Default | What happens |\n|---|---|---|\n| Checkout window | 24h | unpaid deal returns to buyer review; a late payment is credited to the buyer's wallet |\n| Delivery deadline | `delivery_days` (default 7) after payment | buyer gets a one-tap refund |\n| Inspection window | 72h after *mark delivered* | funds auto-release to seller |\n| Dispute settle stage | 48h | auto-escalates to a LymPay mediator |\n| Handover code | 5 wrong tries | code locks, buyer is alerted and issues a new one |\n\n## Anti-scam rules for the app\n- Sellers must only act on **Payment Secured** from LymPay itself (push / in-app), never a screenshot or forwarded link.\n- Every secured deal has a public code like `LP-7KQ2-9XHM`, checkable without login: `GET /verify/{code}`.\n- The handover code is only returned to the **buyer** (`GET /escrow/{uuid}`, while `funded` / `awaiting_buyer_release`). Tell buyers to share it only after they have the item.\n\n## Money\n- Refunds (missed deadline, dispute) go to the buyer's **LymPay wallet**.\n- The platform fee is only taken from the seller's share, never from a refund.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{buyer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "0. Setup (log in as buyer, seller, admin)",
+      "description": "Use the normal auth endpoints from the main LemonPay collection to get tokens, then paste them into the collection variables **buyer_token**, **seller_token** and **admin_token**.\n\nThe admin's email must be listed in `WALLET_ADMIN_EMAILS`.\n\nThe requests below just confirm which user each token belongs to.",
+      "item": [
+        {
+          "name": "Who am I (buyer token)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Should return the buyer's profile."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who am I (seller token)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Should return the seller's profile."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Start a deal",
+      "description": "Either side can start. Negotiation goes back and forth until the buyer taps **Accept & Pay**.",
+      "item": [
+        {
+          "name": "1a. Seller creates payment link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "**Seller-initiated deal (most common on Instagram / WhatsApp).**\n\n- `role`: `seller`\n- `buyer_identifier` *(optional)*: buyer's email or phone. If set, only that user can claim the link. If omitted, anyone who opens the link can claim it.\n- `delivery_type`: `physical` (handover code), `service` or `digital` (mark delivered + inspection window)\n- `delivery_days`: 1–90, days to deliver after payment is secured (default 7)\n- Min amount ₦1,000\n\nReturns `share_link` (`{frontend}/pay/{uuid}`) to send to the buyer. Status starts at `pending_buyer_confirmation`.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"role\": \"seller\",\n  \"title\": \"iPhone 13 Pro, 256GB\",\n  \"amount\": 450000,\n  \"seller_terms\": \"UK used, 92% battery, comes with charger.\",\n  \"delivery_type\": \"physical\",\n  \"delivery_days\": 3,\n  \"buyer_identifier\": \"buyer@example.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.escrow && res.data.escrow.uuid;",
+                  "if (v) { pm.collectionVariables.set('escrow_uuid', v); console.log('escrow_uuid =', v); }"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Payment link created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"role\": \"seller\",\n  \"title\": \"iPhone 13 Pro, 256GB\",\n  \"amount\": 450000,\n  \"seller_terms\": \"UK used, 92% battery, comes with charger.\",\n  \"delivery_type\": \"physical\",\n  \"delivery_days\": 3,\n  \"buyer_identifier\": \"buyer@example.com\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Payment link created. Share it with the buyer.\",\n  \"data\": {\n    \"escrow\": {\n      \"uuid\": \"9b1c2f4e-3d6a-4c1e-9f7a-2b8e5d0c7a11\",\n      \"title\": \"iPhone 13 Pro, 256GB\",\n      \"amount\": \"450000.00\",\n      \"status\": \"pending_buyer_confirmation\",\n      \"initiator\": \"seller\",\n      \"delivery_type\": \"physical\",\n      \"delivery_days\": 3,\n      \"payment_method\": null,\n      \"verification_code\": null,\n      \"funded_at\": null,\n      \"delivery_deadline\": null,\n      \"is_payment_secured\": false,\n      \"can_request_refund\": false,\n      \"can_dispute\": false,\n      \"hours_remaining_for_inspection\": null,\n      \"buyer_id\": null\n    },\n    \"share_link\": \"https://lemonpayapp.vercel.app/pay/9b1c2f4e-3d6a-4c1e-9f7a-2b8e5d0c7a11\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "1b. Buyer creates escrow (names seller)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "**Buyer-initiated deal.** `role` defaults to `buyer`.\n\n- `seller_identifier` (required): seller's email or phone. The seller must already be registered.\n- `buyer_terms`, `delivery_type`, `delivery_days`: optional\n\nStatus starts at `pending_seller_agreement`. The seller is notified.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"role\": \"buyer\",\n  \"title\": \"MacBook Pro 2023\",\n  \"amount\": 500000,\n  \"seller_identifier\": \"seller@example.com\",\n  \"buyer_terms\": \"Mint condition, original box, warranty card present.\",\n  \"delivery_type\": \"physical\",\n  \"delivery_days\": 5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.escrow && res.data.escrow.uuid;",
+                  "if (v) { pm.collectionVariables.set('escrow_uuid', v); console.log('escrow_uuid =', v); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Buyer opens link (view escrow)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Anyone logged in can view an **unclaimed** seller payment link. After it's claimed, only the buyer and seller can see it. Response includes `my_role` (`buyer` / `seller` / `null`)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Buyer claims payment link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/claim",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "claim"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Only for seller-created links with no buyer yet. If the seller set `buyer_identifier`, the caller's email or phone must match it. A seller can't claim their own link."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "403 Link for another buyer",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/claim",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "claim"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"This payment link was created for a different buyer.\",\n  \"errors\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "4. Seller adds / updates terms",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/seller-agreement",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "seller-agreement"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Seller only. Allowed in `pending_seller_agreement` (new buyer-created deal) or `awaiting_seller_confirmation` (replying to the buyer's counter). Saves `seller_terms` and moves the deal to `pending_buyer_confirmation`. `delivery_days` is optional.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"seller_terms\": \"Delivery within Lagos in 3 days. Buyer inspects before handing over the code.\",\n  \"delivery_days\": 3\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Buyer counters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/buyer-counter",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "buyer-counter"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Buyer only. Allowed in `pending_buyer_confirmation`. Saves `buyer_terms` and moves the deal to `awaiting_seller_confirmation`. The seller is notified and can accept the counter (next request) or reply with new terms (request 4).",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"buyer_terms\": \"Please include a screen protector.\",\n  \"delivery_days\": 2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Seller accepts buyer's counter (lock)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/confirm-agreement",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "confirm-agreement"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Seller, while `awaiting_seller_confirmation`. Locks the deal (`locked`, `locked_at`, `final_agreement`). The buyer then pays with **fund** or **Accept & Pay**.\n\nBody is optional (`confirmed: true` is still accepted).",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"confirmed\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "409 Seller made the last offer",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/confirm-agreement",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "confirm-agreement"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"confirmed\": true\n}"
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"You made the last offer, so the buyer has to accept it.\",\n  \"errors\": null\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Accept & Pay",
+      "description": "The buyer accepts the seller's terms and pays. Two ways, same result:\n\n- **accept-and-pay**: one call, card / transfer / USSD checkout or wallet.\n- **confirm-agreement → fund**: lock first, then pay from the LymPay wallet. The seller has nothing left to confirm.",
+      "item": [
+        {
+          "name": "Accept terms (lock) — buyer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/confirm-agreement",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "confirm-agreement"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Buyer, while `pending_buyer_confirmation`. Status → **`locked`** straight away (`locked_at` set, `can_be_funded: true`); it does **not** go back to the seller. Check `data.status === \"locked\"`, then call **fund**.\n\nCalling it again while `locked` returns 200 unchanged. Wrong party or wrong status → 409.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"confirmed\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Locked",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/confirm-agreement",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "confirm-agreement"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"confirmed\": true\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Terms accepted. The deal is locked and ready for payment.\",\n  \"data\": {\n    \"uuid\": \"9b1c2f4e-3d6a-4c1e-9f7a-2b8e5d0c7a11\",\n    \"title\": \"iPhone 13 Pro, 256GB\",\n    \"amount\": \"450000.00\",\n    \"status\": \"locked\",\n    \"initiator\": \"seller\",\n    \"delivery_type\": \"physical\",\n    \"delivery_days\": 3,\n    \"payment_method\": \"card\",\n    \"verification_code\": null,\n    \"funded_at\": null,\n    \"delivery_deadline\": \"2026-11-02T10:15:00.000000Z\",\n    \"is_payment_secured\": false,\n    \"can_request_refund\": false,\n    \"can_dispute\": true,\n    \"hours_remaining_for_inspection\": null,\n    \"locked_at\": \"2026-10-30T10:00:00.000000Z\",\n    \"can_be_funded\": true\n  }\n}"
+            },
+            {
+              "name": "409 Buyer made the last offer",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/confirm-agreement",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "confirm-agreement"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"confirmed\": true\n}"
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"You made the last offer, so the seller has to accept it.\",\n  \"errors\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Pay locked deal from wallet (fund)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/fund",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "fund"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Buyer, while `locked` (or `pending_payment`). Debits the LymPay wallet → `funded` (**Payment Secured**).\n\n**Idempotent:** once paid, repeat calls return 200 with the funded escrow and charge nothing. Short balance → 400, nothing changes.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"funding_method\": \"wallet\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "409 Not locked yet",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/fund",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "fund"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"funding_method\": \"wallet\"\n}"
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"You can't pay for this deal while this deal is waiting for the buyer to accept or counter.\",\n  \"errors\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Accept & Pay — card / transfer / USSD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/accept-and-pay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "accept-and-pay"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Allowed in `pending_buyer_confirmation` (first accept), `locked`, or `pending_payment` (**retry checkout**: call again to get a fresh checkout URL). Once paid, repeat calls return 200 with `checkout: null`.\n\n- `payment_method`: `card` (default; Paystack checkout supporting card, bank transfer and USSD) or `wallet`\n- Sets status `pending_payment`, `final_agreement`, and `payment_expires_at` (24h).\n- Returns `data.checkout.authorization_url`. Open it in a browser or webview.\n- The deal becomes **Payment Secured** only when Paystack's `charge.success` webhook arrives. Never on the client's word, and never from the callback redirect.\n- The seller is notified: *\"Buyer accepted — don't ship yet.\"*",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"payment_method\": \"card\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.escrow && res.data.escrow.payment_reference;",
+                  "if (v) { pm.collectionVariables.set('payment_reference', v); console.log('payment_reference =', v); }"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Checkout started",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/accept-and-pay",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "accept-and-pay"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"payment_method\": \"card\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Terms accepted. Complete payment at checkout to secure the deal.\",\n  \"data\": {\n    \"escrow\": {\n      \"uuid\": \"9b1c2f4e-3d6a-4c1e-9f7a-2b8e5d0c7a11\",\n      \"title\": \"iPhone 13 Pro, 256GB\",\n      \"amount\": \"450000.00\",\n      \"status\": \"pending_payment\",\n      \"initiator\": \"seller\",\n      \"delivery_type\": \"physical\",\n      \"delivery_days\": 3,\n      \"payment_method\": \"card\",\n      \"verification_code\": null,\n      \"funded_at\": null,\n      \"delivery_deadline\": \"2026-11-02T10:15:00.000000Z\",\n      \"is_payment_secured\": false,\n      \"can_request_refund\": false,\n      \"can_dispute\": true,\n      \"hours_remaining_for_inspection\": null,\n      \"payment_reference\": \"esc-1f0c7c9e-8f61-4c7b-9a51-0b6c1d2e3f40\",\n      \"payment_expires_at\": \"2026-10-31T10:00:00.000000Z\"\n    },\n    \"checkout\": {\n      \"authorization_url\": \"https://checkout.paystack.com/abc123\",\n      \"access_code\": \"abc123\",\n      \"reference\": \"esc-1f0c7c9e-8f61-4c7b-9a51-0b6c1d2e3f40\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Accept & Pay — LymPay wallet (optional)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/accept-and-pay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "accept-and-pay"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Pays straight from the buyer's prefunded wallet. Status goes to `funded` (**Payment Secured**) in the same request, and `data.checkout` is `null`. If the balance is short, returns 400 and nothing changes. Offer card instead.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"payment_method\": \"wallet\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Payment secured",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/accept-and-pay",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "accept-and-pay"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"payment_method\": \"wallet\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Payment secured. The seller has been notified.\",\n  \"data\": {\n    \"escrow\": {\n      \"uuid\": \"9b1c2f4e-3d6a-4c1e-9f7a-2b8e5d0c7a11\",\n      \"title\": \"iPhone 13 Pro, 256GB\",\n      \"amount\": \"450000.00\",\n      \"status\": \"funded\",\n      \"initiator\": \"seller\",\n      \"delivery_type\": \"physical\",\n      \"delivery_days\": 3,\n      \"payment_method\": \"wallet\",\n      \"verification_code\": \"LP-7KQ2-9XHM\",\n      \"funded_at\": \"2026-10-30T10:15:00.000000Z\",\n      \"delivery_deadline\": \"2026-11-02T10:15:00.000000Z\",\n      \"is_payment_secured\": true,\n      \"can_request_refund\": false,\n      \"can_dispute\": true,\n      \"hours_remaining_for_inspection\": null\n    },\n    \"checkout\": null\n  }\n}"
+            },
+            {
+              "name": "400 Insufficient wallet balance",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/accept-and-pay",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "accept-and-pay"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"payment_method\": \"wallet\"\n}"
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Insufficient funds in buyer wallet\",\n  \"errors\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Simulate Paystack charge.success (signed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wallet/paystack/webhook",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallet",
+                "paystack",
+                "webhook"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "**Local testing only.** Imitates what Paystack sends after the buyer pays.\n\nThe pre-request script signs the body with **paystack_secret** (HMAC-SHA512, `x-paystack-signature`), so it must equal `PAYSTACK_SECRET` in your `.env`. It uses `{{payment_reference}}`, `{{escrow_uuid}}` and `{{escrow_amount_kobo}}`. Set the amount in kobo (₦450,000 = 45000000).\n\nEffect:\n- Exact amount and the deal is awaiting payment → `funded`. A handover code and a verification code are issued and both sides are notified.\n- Expired / already-paid deal, or wrong amount → money is credited to the buyer's wallet instead.\n- Replays are ignored.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"event\": \"charge.success\",\n  \"data\": {\n    \"reference\": \"{{payment_reference}}\",\n    \"status\": \"success\",\n    \"amount\": \"{{escrow_amount_kobo}}\",\n    \"metadata\": {\n      \"purpose\": \"escrow_payment\",\n      \"escrow_uuid\": \"{{escrow_uuid}}\",\n      \"user_id\": \"{{buyer_id}}\"\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Build the body with real values, then sign it exactly like Paystack",
+                  "const body = {",
+                  "  event: 'charge.success',",
+                  "  data: {",
+                  "    reference: pm.collectionVariables.get('payment_reference'),",
+                  "    status: 'success',",
+                  "    amount: Number(pm.collectionVariables.get('escrow_amount_kobo')),",
+                  "    metadata: {",
+                  "      purpose: 'escrow_payment',",
+                  "      escrow_uuid: pm.collectionVariables.get('escrow_uuid'),",
+                  "      user_id: pm.collectionVariables.get('buyer_id')",
+                  "    }",
+                  "  }",
+                  "};",
+                  "const raw = JSON.stringify(body);",
+                  "pm.request.body.raw = raw;",
+                  "const sig = CryptoJS.HmacSHA512(raw, pm.collectionVariables.get('paystack_secret')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'x-paystack-signature', value: sig });",
+                  "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Simulation checkout (PAYSTACK_SIMULATION=true)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wallet/paystack/sim-checkout?reference={{payment_reference}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallet",
+                "paystack",
+                "sim-checkout"
+              ],
+              "query": [
+                {
+                  "key": "reference",
+                  "value": "{{payment_reference}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Only works when `PAYSTACK_SIMULATION=true`, otherwise it returns 404. Acts as a fake Paystack checkout: it applies the escrow payment and redirects to `lympay://escrow-payment-success?uuid=…&reference=…`. Turn off *Automatically follow redirects* to see the deep link."
+          }
+        },
+        {
+          "name": "Paystack callback (browser redirect)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/payment/callback?reference={{payment_reference}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "payment",
+                "callback"
+              ],
+              "query": [
+                {
+                  "key": "reference",
+                  "value": "{{payment_reference}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Where Paystack sends the buyer's browser after checkout (no auth). Verifies the transaction with Paystack and redirects to the app:\n\n- `lympay://escrow-payment-success?uuid={uuid}&reference={ref}`\n- `lympay://escrow-payment-failed?uuid={uuid}&message=…`\n\nThe app should then refresh `GET /escrow/{uuid}`. The status changes to `funded` only once the webhook has been processed. Show *\"Confirming payment…\"* until then."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Payment Secured & verification",
+      "description": "What each side sees once the money is held by LymPay.",
+      "item": [
+        {
+          "name": "Buyer view — includes handover code",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "While the status is `funded` or `awaiting_buyer_release`, the **buyer** (and only the buyer) gets `data.handover_code` (4 digits). Show it with: *\"Only give this code to the seller or rider once you have the item and are happy with it.\"*\n\nUseful fields: `verification_code`, `delivery_deadline`, `can_request_refund`, `can_dispute`, `hours_remaining_for_inspection`, `my_role`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.handover_code;",
+                  "if (v) { pm.collectionVariables.set('handover_code', v); console.log('handover_code =', v); }",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.verification_code;",
+                  "if (v) { pm.collectionVariables.set('verification_code', v); console.log('verification_code =', v); }"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Buyer view",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Escrow retrieved successfully\",\n  \"data\": {\n    \"uuid\": \"9b1c2f4e-3d6a-4c1e-9f7a-2b8e5d0c7a11\",\n    \"title\": \"iPhone 13 Pro, 256GB\",\n    \"amount\": \"450000.00\",\n    \"status\": \"funded\",\n    \"initiator\": \"seller\",\n    \"delivery_type\": \"physical\",\n    \"delivery_days\": 3,\n    \"payment_method\": \"card\",\n    \"verification_code\": \"LP-7KQ2-9XHM\",\n    \"funded_at\": \"2026-10-30T10:15:00.000000Z\",\n    \"delivery_deadline\": \"2026-11-02T10:15:00.000000Z\",\n    \"is_payment_secured\": true,\n    \"can_request_refund\": false,\n    \"can_dispute\": true,\n    \"hours_remaining_for_inspection\": null,\n    \"my_role\": \"buyer\",\n    \"handover_code\": \"4821\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Seller view — no handover code",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "The seller sees `verification_code` and `delivery_deadline` but never the handover code. Seller screens should say: *\"Never ship based on a screenshot. Only trust Payment Secured in your LymPay app.\"*"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify a payment code (public)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/verify/{{verification_code}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "verify",
+                "{{verification_code}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "**No login.** Rate-limited to 20/min. Backs the *Check a code* page on the LymPay site. Returns the title, amount, seller's first name and whether payment is secured. It never returns buyer details."
+          },
+          "response": [
+            {
+              "name": "200 Secured",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/verify/{{verification_code}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "verify",
+                    "{{verification_code}}"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Payment is secured with LymPay. Safe to deliver.\",\n  \"data\": {\n    \"verification_code\": \"LP-7KQ2-9XHM\",\n    \"title\": \"iPhone 13 Pro, 256GB\",\n    \"amount\": \"450000.00\",\n    \"seller_first_name\": \"Ada\",\n    \"payment_secured\": true,\n    \"status\": \"funded\",\n    \"funded_at\": \"2026-10-30T10:15:00.000000Z\",\n    \"delivery_deadline\": \"2026-11-02T10:15:00.000000Z\"\n  }\n}"
+            },
+            {
+              "name": "404 Unknown code",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/verify/{{verification_code}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "verify",
+                    "{{verification_code}}"
+                  ]
+                },
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"No LymPay deal matches this code. Do not ship.\",\n  \"errors\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "My escrows",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/my-escrows?per_page=15",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "my-escrows"
+              ],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "buyer",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "funded",
+                  "disabled": true
+                },
+                {
+                  "key": "per_page",
+                  "value": "15"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Deals where the user is buyer or seller. Filters: `role` (buyer|seller), `status`, `per_page`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Delivery & release",
+      "description": "Two ways to finish:\n\n1. **Handover code** (physical goods, in person): one step that counts as both delivered and received. Money is released immediately.\n2. **Mark delivered** (services, digital, courier): starts a 72h inspection window. The buyer confirms or raises an issue, or the money auto-releases.\n\nIf the seller misses `delivery_deadline`, the buyer gets a one-tap refund.",
+      "item": [
+        {
+          "name": "Seller enters handover code → release",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/handover",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "handover"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Allowed in `funded` / `awaiting_buyer_release`. `code` must be exactly 4 digits. Rate-limited to 10/min.\n\n- Correct → `released`. The seller's wallet is credited (minus any fee).\n- Wrong → 422 with attempts left.\n- After 5 wrong tries, the code locks and the buyer is alerted. Even the correct code is refused until the buyer issues a new one.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"code\": \"{{handover_code}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 Released",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/handover",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "handover"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"code\": \"{{handover_code}}\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Handover confirmed. Funds released to your wallet.\",\n  \"data\": {\n    \"uuid\": \"9b1c2f4e-3d6a-4c1e-9f7a-2b8e5d0c7a11\",\n    \"title\": \"iPhone 13 Pro, 256GB\",\n    \"amount\": \"450000.00\",\n    \"status\": \"released\",\n    \"initiator\": \"seller\",\n    \"delivery_type\": \"physical\",\n    \"delivery_days\": 3,\n    \"payment_method\": \"card\",\n    \"verification_code\": \"LP-7KQ2-9XHM\",\n    \"funded_at\": \"2026-10-30T10:15:00.000000Z\",\n    \"delivery_deadline\": \"2026-11-02T10:15:00.000000Z\",\n    \"is_payment_secured\": false,\n    \"can_request_refund\": false,\n    \"can_dispute\": false,\n    \"hours_remaining_for_inspection\": null,\n    \"received_at\": \"2026-10-31T14:02:00.000000Z\",\n    \"released_at\": \"2026-10-31T14:02:00.000000Z\"\n  }\n}"
+            },
+            {
+              "name": "422 Wrong code",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/handover",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "handover"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"code\": \"{{handover_code}}\"\n}"
+                }
+              },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Wrong handover code. 4 attempt(s) left.\",\n  \"errors\": null\n}"
+            },
+            {
+              "name": "409 Locked",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/handover",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "handover"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"code\": \"{{handover_code}}\"\n}"
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Too many wrong codes. The buyer has been alerted and must issue a new code.\",\n  \"errors\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Buyer issues new handover code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/handover-code/reset",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "handover-code",
+                "reset"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Issues a new 4-digit code and clears the lock and attempt counter. Use it after a lockout, or if the buyer thinks the code leaked."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.handover_code;",
+                  "if (v) { pm.collectionVariables.set('handover_code', v); console.log('handover_code =', v); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Seller marks delivered (starts inspection window)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/mark-delivered",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "mark-delivered"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Allowed in `funded`. Moves to `awaiting_buyer_release` and sets `buyer_confirmation_deadline` to now + 72h. `evidence` is optional: an array of strings such as waybill numbers or URLs. If the buyer does nothing before the deadline, the money auto-releases (scheduler runs every 5 min). Calling it again doesn't restart the window.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"evidence\": [\n    \"GIG waybill #GIG-883412\",\n    \"https://example.com/proof.jpg\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "409 Not paid yet",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/mark-delivered",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "mark-delivered"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"evidence\": [\n    \"GIG waybill #GIG-883412\",\n    \"https://example.com/proof.jpg\"\n  ]\n}"
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"You can't mark it delivered while this deal is waiting for the buyer to accept or counter.\",\n  \"errors\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "Buyer confirms delivery → release",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/confirm-delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "confirm-delivery"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Allowed in `awaiting_buyer_release`. Releases the money to the seller right away. **Idempotent:** once released, repeat calls return 200 unchanged."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buyer one-tap refund (delivery deadline missed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/refund",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "refund"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Only when status is `funded` **and** `delivery_deadline` has passed (`can_request_refund: true`). Refunds the full amount to the buyer's LymPay wallet. Status → `refunded`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "409 Too early",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/escrow/{{escrow_uuid}}/refund",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "escrow",
+                    "{{escrow_uuid}}",
+                    "refund"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"A refund is available once the delivery deadline has passed without delivery.\",\n  \"errors\": null\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Disputes (settle → mediation)",
+      "description": "**Settle stage (48h):** the complaint goes to the other party. Both can message and add evidence. Either side makes a one-tap offer, and when the other side accepts, the money moves.\n\n**Mediation:** either party escalates once 48h have passed or an offer is declined. The scheduler escalates automatically. A LymPay mediator (admin) then decides. The parties can still settle during mediation.\n\nOutcomes: `redeliver` (back to `funded` with a new deadline), `partial_refund` (+ `refund_amount`), `full_refund`, `release`.",
+      "item": [
+        {
+          "name": "Buyer opens dispute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Allowed while `funded` or `awaiting_buyer_release`. This freezes the escrow (`disputed`) and stops auto-release.\n\nBuyer reasons: `not_received`, `wrong_item`, `damaged_item`, `other`. `attachment` (jpg/png/pdf, ≤2MB) is optional; send it as form-data.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "escrow_uuid",
+                  "value": "{{escrow_uuid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "reason",
+                  "value": "damaged_item",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Screen arrived cracked.",
+                  "type": "text"
+                },
+                {
+                  "key": "attachment",
+                  "type": "file",
+                  "src": [],
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.uuid;",
+                  "if (v) { pm.collectionVariables.set('dispute_uuid', v); console.log('dispute_uuid =', v); }"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Opened",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/disputes",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "disputes"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{buyer_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "escrow_uuid",
+                      "value": "{{escrow_uuid}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "reason",
+                      "value": "damaged_item",
+                      "type": "text"
+                    },
+                    {
+                      "key": "description",
+                      "value": "Screen arrived cracked.",
+                      "type": "text"
+                    },
+                    {
+                      "key": "attachment",
+                      "type": "file",
+                      "src": [],
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Dispute opened. The other party has been notified and has 48 hours to settle with you before a LymPay mediator steps in.\",\n  \"data\": {\n    \"uuid\": \"d7e1…\",\n    \"status\": \"active\",\n    \"stage\": \"settle\",\n    \"opened_by_role\": \"buyer\",\n    \"reason\": \"damaged_item\",\n    \"settle_deadline\": \"2026-11-01T09:00:00.000000Z\",\n    \"messages\": [\n      {\n        \"type\": \"message\",\n        \"body\": \"Screen arrived cracked.\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Seller opens dispute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Sellers can open disputes too, for example when the buyer goes silent or falsely claims non-delivery. Seller reasons: `buyer_unresponsive`, `false_non_delivery_claim`, `other`. A buyer-only reason returns 403.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "escrow_uuid",
+                  "value": "{{escrow_uuid}}",
+                  "type": "text"
+                },
+                {
+                  "key": "reason",
+                  "value": "false_non_delivery_claim",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Buyer picked it up from my shop on Tuesday.",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.uuid;",
+                  "if (v) { pm.collectionVariables.set('dispute_uuid', v); console.log('dispute_uuid =', v); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List my disputes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes"
+              ],
+              "query": [
+                {
+                  "key": "stage",
+                  "value": "settle",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "dispute",
+                  "disabled": true
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Disputes I opened **or** that were opened on my deals. Filters: `type` (dispute|support|all), `status`, `stage` (settle|mediation|closed)."
+          }
+        },
+        {
+          "name": "Get dispute (conversation + offers)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes/{{dispute_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes",
+                "{{dispute_uuid}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Visible to both parties and admins. Includes `messages` (types: `message`, `proposal`, `system`), `proposals` (newest first) and `can_escalate`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reply with evidence",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes/{{dispute_uuid}}/messages",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes",
+                "{{dispute_uuid}}",
+                "messages"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "`body` is required. `attachments[]` is optional: up to 5 files (jpg/png/pdf/mp4, ≤10MB each).",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "body",
+                  "value": "Here is the dispatch photo showing the screen intact.",
+                  "type": "text"
+                },
+                {
+                  "key": "attachments[]",
+                  "type": "file",
+                  "src": [],
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Offer: partial refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes/{{dispute_uuid}}/proposals",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes",
+                "{{dispute_uuid}}",
+                "proposals"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "One-tap offer. Replaces any earlier pending offer. For `partial_refund`, `refund_amount` must be > 0 and < the escrow amount.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"outcome\": \"partial_refund\",\n  \"refund_amount\": 50000,\n  \"note\": \"Covers a screen replacement.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.uuid;",
+                  "if (v) { pm.collectionVariables.set('proposal_uuid', v); console.log('proposal_uuid =', v); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Offer: full refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes/{{dispute_uuid}}/proposals",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes",
+                "{{dispute_uuid}}",
+                "proposals"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Seller agrees to give all the money back.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"outcome\": \"full_refund\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.uuid;",
+                  "if (v) { pm.collectionVariables.set('proposal_uuid', v); console.log('proposal_uuid =', v); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Offer: redeliver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes/{{dispute_uuid}}/proposals",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes",
+                "{{dispute_uuid}}",
+                "proposals"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Seller sends a replacement. If accepted, the escrow goes back to `funded` with a new delivery deadline.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"outcome\": \"redeliver\",\n  \"note\": \"Sending a replacement tomorrow.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.uuid;",
+                  "if (v) { pm.collectionVariables.set('proposal_uuid', v); console.log('proposal_uuid =', v); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Offer: release to seller",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes/{{dispute_uuid}}/proposals",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes",
+                "{{dispute_uuid}}",
+                "proposals"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Buyer withdraws the complaint and pays the seller. Typical ending for seller-opened disputes.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"outcome\": \"release\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const res = pm.response.json();",
+                  "const v = res.data && res.data.uuid;",
+                  "if (v) { pm.collectionVariables.set('proposal_uuid', v); console.log('proposal_uuid =', v); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept offer → money moves",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes/{{dispute_uuid}}/proposals/{{proposal_uuid}}/accept",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes",
+                "{{dispute_uuid}}",
+                "proposals",
+                "{{proposal_uuid}}",
+                "accept"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Must be the **other** party (accepting your own offer returns 403). The money moves immediately and the dispute closes (`stage: closed`, `outcome` set)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Decline offer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes/{{dispute_uuid}}/proposals/{{proposal_uuid}}/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes",
+                "{{dispute_uuid}}",
+                "proposals",
+                "{{proposal_uuid}}",
+                "reject"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Declining unlocks escalation right away for either party."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Escalate to LymPay mediator",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/disputes/{{dispute_uuid}}/escalate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "disputes",
+                "{{dispute_uuid}}",
+                "escalate"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Allowed once the 48h settle window has passed **or** an offer has been declined. Otherwise returns 403 *\"Try settling first…\"*. Moves to `stage: mediation`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin: decide outcome (money moves)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/disputes/{{dispute_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "disputes",
+                "{{dispute_uuid}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Admin only (email in `WALLET_ADMIN_EMAILS`). Works at any open stage.\n\n- `outcome`: `redeliver` | `partial_refund` | `full_refund` | `release`\n- `refund_amount`: required for `partial_refund`\n- `admin_notes`: optional",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"outcome\": \"partial_refund\",\n  \"refund_amount\": 50000,\n  \"admin_notes\": \"Photos confirm a hairline crack; split agreed by mediator.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin: close support ticket",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/disputes/{{dispute_uuid}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "disputes",
+                "{{dispute_uuid}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "For support tickets only (no reason / no money). Escrow disputes must be resolved with an `outcome`; otherwise this returns 422.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"status\": \"resolved\",\n  \"admin_notes\": \"Answered by email.\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Payout protection",
+      "description": "Stops stolen funds leaving through mule accounts:\n\n- The bank account name must match the user's verified (BVN/NIN) name, or the profile name until KYC is connected.\n- 24h hold on brand-new users and on newly added bank accounts.\n\nConfigured by `WALLET_ENFORCE_PAYOUT_NAME_MATCH`, `WALLET_NEW_USER_HOLD_HOURS` and `WALLET_NEW_BANK_ACCOUNT_HOLD_HOURS`. Name checks are skipped when `PAYSTACK_SIMULATION=true`.",
+      "item": [
+        {
+          "name": "List supported banks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/banks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "banks"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Bank names and their `code` (use it as `bank_code` below)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify account name (before adding)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/bank-accounts/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bank-accounts",
+                "verify"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Looks the account up with Paystack and returns `verified_name`. Show it to the user before they add the account; it has to match their own name.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"bank_code\": \"000013\",\n  \"account_number\": \"0123456789\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add bank account (name must match)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/bank-accounts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bank-accounts"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Resolves the account name with Paystack and compares it with the user's name, in any word order (e.g. `OBI ADA C.` matches *Ada Obi*).",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"bank_code\": \"000013\",\n  \"account_number\": \"0123456789\"\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "422 Not your account",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/bank-accounts",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "bank-accounts"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"bank_code\": \"000013\",\n  \"account_number\": \"0123456789\"\n}"
+                }
+              },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"This bank account is not in your name. You can only withdraw to an account whose name matches your verified identity.\",\n  \"errors\": null\n}"
+            }
+          ]
+        },
+        {
+          "name": "List my bank accounts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/bank-accounts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "bank-accounts"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Includes `name_matched` (true / false / null if not checked yet). Use an account's `id` as `bank_account_id` when withdrawing."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Withdraw (holds + name check)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/withdraw",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "withdraw"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Min ₦1,000. Starts the payout and returns its `reference`. If transfer OTP is switched on for the Paystack account, Paystack sends an OTP to the business phone and the payout waits until the next request.\n\nErrors come back as 400 with the reason in `errors.message`.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"amount\": 5000,\n  \"bank_account_id\": 1\n}"
+            }
+          },
+          "response": [
+            {
+              "name": "400 New user hold",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/withdraw",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "withdraw"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"amount\": 5000,\n  \"bank_account_id\": 1\n}"
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Failed to initiate withdrawal\",\n  \"errors\": {\n    \"message\": \"New accounts can withdraw 24 hours after sign-up. Your funds are safe in your wallet.\"\n  }\n}"
+            },
+            {
+              "name": "400 New bank account hold",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/withdraw",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "withdraw"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"amount\": 5000,\n  \"bank_account_id\": 1\n}"
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Failed to initiate withdrawal\",\n  \"errors\": {\n    \"message\": \"Newly added bank accounts can receive withdrawals 24 hours after they are added.\"\n  }\n}"
+            },
+            {
+              "name": "400 Name mismatch",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/withdraw",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "withdraw"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{seller_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  },
+                  "raw": "{\n  \"amount\": 5000,\n  \"bank_account_id\": 1\n}"
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Failed to initiate withdrawal\",\n  \"errors\": {\n    \"message\": \"Withdrawals can only go to a bank account in your own name.\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Finalize withdrawal with OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wallet/withdraw/finalize-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallet",
+                "withdraw",
+                "finalize-otp"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Only needed when transfer OTP is on for the Paystack account. `reference` comes from the withdraw response; `otp` is the 6-digit code Paystack sent. Unknown reference → 404.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"reference\": \"WD-REFERENCE-FROM-WITHDRAW\",\n  \"otp\": \"123456\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Deprecated",
+      "description": "Kept so older app builds don't break.",
+      "item": [
+        {
+          "name": "Seller confirm (alias)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/escrow/{{escrow_uuid}}/seller-confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "escrow",
+                "{{escrow_uuid}}",
+                "seller-confirm"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{seller_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Deprecated, seller-only alias of `confirm-agreement` (1. Start a deal → 6). The buyer gets 409 here.",
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"confirmed\": true\n}"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api",
+      "type": "string"
+    },
+    {
+      "key": "buyer_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "seller_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "buyer_id",
+      "value": "",
+      "type": "string",
+      "description": "Buyer's user id (for the simulated webhook metadata)"
+    },
+    {
+      "key": "paystack_secret",
+      "value": "",
+      "type": "string",
+      "description": "Must equal PAYSTACK_SECRET in .env (signs the simulated webhook)"
+    },
+    {
+      "key": "escrow_amount_kobo",
+      "value": "45000000",
+      "type": "string",
+      "description": "Escrow amount × 100"
+    },
+    {
+      "key": "escrow_uuid",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "payment_reference",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "verification_code",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "handover_code",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "dispute_uuid",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "proposal_uuid",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

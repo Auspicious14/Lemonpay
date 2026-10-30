@@ -80,12 +80,13 @@ export default function NotificationsScreen() {
 
     // Navigate based on data embedded in notification
     const d = notif.data || {};
-    if (d.escrow_uuid) {
-      router.push(`/escrow/${d.escrow_uuid}`);
-      return;
-    }
+    // Dispute notifications usually carry the escrow too — open the dispute.
     if (d.dispute_uuid) {
       router.push(`/disputes/${d.dispute_uuid}`);
+      return;
+    }
+    if (d.escrow_uuid) {
+      router.push(`/escrow/${d.escrow_uuid}`);
       return;
     }
   };

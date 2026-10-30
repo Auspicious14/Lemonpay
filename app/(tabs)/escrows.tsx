@@ -16,7 +16,7 @@ import { useMyEscrows } from "@/lib/hooks/useEscrow";
 import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
 import { EscrowStatus, Escrow } from "@/types/api";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
-import { getStatusBadgeInfo } from "@/lib/utils/escrow";
+import { getStatusBadgeInfo, isActiveEscrow, getEscrowPhase } from "@/lib/utils/escrow";
 import { EscrowProgressBar } from "@/components/ui/EscrowProgressBar";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -59,14 +59,10 @@ export default function EscrowsScreen() {
   const filteredEscrows = useMemo(() => {
     const allEscrows = escrowsData?.data || [];
     if (activeFilter === "ACTIVE") {
-      return allEscrows.filter((escrow) =>
-        [
-          "locked",
-          "funded",
-          "awaiting_buyer_release",
-          "pending_seller_agreement",
-          "pending_buyer_confirmation",
-        ].includes(escrow.status)
+      // Counter-offers used to drop out of this tab; disputes have their own.
+      return allEscrows.filter(
+        (escrow) =>
+          isActiveEscrow(escrow.status) && getEscrowPhase(escrow.status) !== "disputed",
       );
     }
     if (activeFilter === "COMPLETED") {
@@ -82,7 +78,7 @@ export default function EscrowsScreen() {
 
   const renderEscrowItem = ({ item }: { item: Escrow }) => {
     const badgeInfo = getStatusBadgeInfo(item.status);
-    const isBuyer = user?.id === item.buyer_id;
+    const isBuyer = item.my_role ? item.my_role === "buyer" : user?.id === item.buyer_id;
     
     let colorClass = "text-gray-400";
     let bgClass = "bg-[#30363D]";
@@ -121,7 +117,7 @@ export default function EscrowsScreen() {
         <Text className="text-[#8B949E] font-inter text-sm mb-4">
           With {isBuyer 
             ? (item.seller?.first_name ? `${item.seller.first_name} ${item.seller.last_name}` : item.seller_identifier)
-            : `${item.buyer.first_name} ${item.buyer.last_name}`}
+            : item.buyer?.first_name ? `${item.buyer.first_name} ${item.buyer.last_name}` : "Awaiting buyer"}
         </Text>
 
         <EscrowProgressBar status={item.status} />
@@ -131,7 +127,7 @@ export default function EscrowsScreen() {
             {formatCurrency(item.amount)}
           </Text>
           <Text className="text-[#8B949E] font-inter text-xs">
-            {formatDate(item.created_at)}
+            {formatDate(item.created_at ?? "")}
           </Text>
         </View>
       </TouchableOpacity>
@@ -181,7 +177,7 @@ export default function EscrowsScreen() {
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => {
           const badgeInfo = getStatusBadgeInfo(item.status);
-          const isBuyer = user?.id === item.buyer_id;
+          const isBuyer = item.my_role ? item.my_role === "buyer" : user?.id === item.buyer_id;
           
           let colorClass = "text-gray-400";
           let bgClass = "bg-[#30363D]";
@@ -233,7 +229,7 @@ export default function EscrowsScreen() {
               >
                 With {isBuyer 
                   ? (item.seller?.first_name ? `${item.seller.first_name} ${item.seller.last_name}` : item.seller_identifier)
-                  : `${item.buyer.first_name} ${item.buyer.last_name}`}
+                  : item.buyer?.first_name ? `${item.buyer.first_name} ${item.buyer.last_name}` : "Awaiting buyer"}
               </Text>
 
               <EscrowProgressBar status={item.status} />
@@ -249,7 +245,7 @@ export default function EscrowsScreen() {
                   style={{ fontFamily: 'Inter' }}
                   className="text-[#8B949E] text-xs"
                 >
-                  {formatDate(item.created_at)}
+                  {formatDate(item.created_at ?? "")}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -301,7 +297,7 @@ export default function EscrowsScreen() {
                   ? 'Create your first escrow to start a secure transaction.' 
                   : 'Try changing your filter to see other escrows.'} 
               </Text> 
-              {!isSeller && activeFilter === 'ALL' && ( 
+              {activeFilter === 'ALL' && ( 
                 <TouchableOpacity 
                   onPress={() => router.push('/escrow/create')} 
                   style={{ overflow: 'hidden', borderRadius: 12 }} 
@@ -332,7 +328,7 @@ export default function EscrowsScreen() {
       />
 
       {/* FAB */}
-      {!isSeller && (
+      {(
         <TouchableOpacity
           className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-accent-primary items-center justify-center shadow-lg"
           style={{ elevation: 5 }}
