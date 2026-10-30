@@ -16,7 +16,7 @@ import { useMyEscrows } from "@/lib/hooks/useEscrow";
 import { useRefreshOnFocus } from "@/lib/hooks/useRefreshOnFocus";
 import { EscrowStatus, Escrow } from "@/types/api";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
-import { getStatusBadgeInfo } from "@/lib/utils/escrow";
+import { getStatusBadgeInfo, isActiveEscrow, getEscrowPhase } from "@/lib/utils/escrow";
 import { EscrowProgressBar } from "@/components/ui/EscrowProgressBar";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -59,14 +59,10 @@ export default function EscrowsScreen() {
   const filteredEscrows = useMemo(() => {
     const allEscrows = escrowsData?.data || [];
     if (activeFilter === "ACTIVE") {
-      return allEscrows.filter((escrow) =>
-        [
-          "locked",
-          "funded",
-          "awaiting_buyer_release",
-          "pending_seller_agreement",
-          "pending_buyer_confirmation",
-        ].includes(escrow.status)
+      // Counter-offers used to drop out of this tab; disputes have their own.
+      return allEscrows.filter(
+        (escrow) =>
+          isActiveEscrow(escrow.status) && getEscrowPhase(escrow.status) !== "disputed",
       );
     }
     if (activeFilter === "COMPLETED") {

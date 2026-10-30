@@ -37,31 +37,19 @@ import {
 } from "@/lib/hooks/useEscrow";
 import { useWalletBalance } from "@/lib/hooks/useWallet";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
-import { getUserRole } from "@/lib/utils/escrow";
+import { getUserRole, getEscrowPhase } from "@/lib/utils/escrow";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useToastStore } from "@/store/useToastStore";
 import { useDialogStore } from "@/store/useDialogStore";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { NotificationBell } from "@/components/ui/NotificationBell";
-import { Escrow, EscrowStatusEnum } from "@/types/api";
+import { Escrow } from "@/types/api";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FULL STATUS LIFECYCLE (from API):
-//
-//   pending_seller_agreement     → seller adds their terms
-//   pending_buyer_confirmation   → buyer sees seller terms, accepts OR counters
-//   awaiting_seller_confirmation → seller sees buyer counter, accepts OR counters
-//   locked                       → both confirmed, buyer can fund
-//   funded                       → seller prepares & delivers
-//   awaiting_buyer_release       → seller marked delivered, buyer confirms
-//   released                     → funds sent to seller ✅
-//   disputed                     → dispute in progress
-//   resolved                     → dispute resolved
-//   refunded                     → funds returned to buyer
-//
-// is_negotiating: true means back-and-forth still happening
-// can_be_funded: true means escrow is locked and ready to fund
+// Status lifecycle and the "one person acts at a time" rule live in
+// lib/utils/escrow.ts (getEscrowPhase). Read the escrow through the phase,
+// never through raw status strings.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const detectAmountMismatch = (
@@ -97,42 +85,33 @@ const NegotiationThread = ({
     isLatest: boolean;
   }> = [];
 
-  // Always show buyer's original proposal first
-  if (escrow.buyer_terms) {
+  const phase = getEscrowPhase(escrow.status);
+  // In seller_review the API has overwritten buyer_terms with the buyer's
+  // counter, so we show it once — as the counter — after the seller's terms.
+  const buyerCountered =
+    phase === "seller_review" && !!escrow.buyer_terms && !!escrow.seller_terms;
+
+  if (escrow.buyer_terms && !buyerCountered) {
     messages.push({
       role: "buyer",
       terms: escrow.buyer_terms,
       label: "BUYER PROPOSAL",
       color: "#3b82f6",
-      isLatest:
-        escrow.status === "pending_seller_agreement" && !escrow.seller_terms,
+      isLatest: phase === "seller_terms" && !escrow.seller_terms,
     });
   }
 
-  // Show seller's terms if they exist
   if (escrow.seller_terms) {
     messages.push({
       role: "seller",
       terms: escrow.seller_terms,
-      label:
-        escrow.status === "awaiting_seller_confirmation"
-          ? "SELLER RESPONSE"
-          : "SELLER TERMS",
+      label: buyerCountered ? "SELLER RESPONSE" : "SELLER TERMS",
       color: "#00C896",
-      isLatest: escrow.status === "pending_buyer_confirmation",
+      isLatest: phase === "buyer_review",
     });
   }
 
-  // If status is awaiting_seller_confirmation, buyer_terms has been updated
-  // with the buyer's counter — show it as a counter message
-  if (
-    escrow.status === "awaiting_seller_confirmation" &&
-    escrow.buyer_terms &&
-    escrow.seller_terms
-  ) {
-    // The buyer_terms was updated with the counter
-    // We show it distinctly as a counter (it may be the same text shown above)
-    // Only add if it visually differs from original proposal intent
+  if (buyerCountered) {
     messages.push({
       role: "buyer",
       terms: escrow.buyer_terms,
@@ -344,33 +323,30 @@ export default function EscrowDetailScreen() {
   const role = getUserRole(escrow, user?.id || "");
   const isBuyer = role === "buyer";
   const isSeller = role === "seller";
-
-  console.log("[ROLE]", { userId: user?.id, buyerId: escrow.buyer_id, sellerId: escrow.seller_id, role });
-  console.log("[ESCROW STATUS]", escrow.status, "| can_be_funded:", escrow.can_be_funded, "| is_negotiating:", escrow.is_negotiating);
+  const phase = getEscrowPhase(escrow.status);
 
   const amount = parseFloat(escrow.amount);
   const hasMismatch = escrow.seller_terms
     ? detectAmountMismatch(escrow.seller_terms, amount)
     : false;
 
-  const getStatusDisplay = (status: string) => {
+  const getStatusDisplay = () => {
     const map: Record<string, { label: string; color: string; bg: string }> = {
-      pending_seller_agreement:     { label: "PENDING SELLER", color: "#F5E642", bg: "#2D3018" },
-      pending_buyer_confirmation:   { label: "REVIEW NEEDED",  color: "#F5E642", bg: "#2D3018" },
-      awaiting_seller_confirmation: { label: "NEGOTIATING",    color: "#F5E642", bg: "#2D3018" },
-      pending_seller_confirmation:  { label: "NEGOTIATING",    color: "#F5E642", bg: "#2D3018" },
-      locked:                       { label: "LOCKED",         color: "#F5E642", bg: "#2D3018" },
-      funded:                       { label: "FUNDED",         color: "#3b82f6", bg: "#1e3a5f" },
-      awaiting_buyer_release:       { label: "AWAITING RELEASE", color: "#F5E642", bg: "#2D3018" },
-      released:                     { label: "RELEASED",       color: "#00C896", bg: "#00C89615" },
-      disputed:                     { label: "DISPUTED",       color: "#FF4D4F", bg: "#FF4D4F15" },
-      resolved:                     { label: "RESOLVED",       color: "#00C896", bg: "#00C89615" },
-      refunded:                     { label: "REFUNDED",       color: "#8B949E", bg: "#21262D" },
+      seller_terms:     { label: "PENDING SELLER",   color: "#F5E642", bg: "#2D3018" },
+      buyer_review:     { label: "REVIEW NEEDED",    color: "#F5E642", bg: "#2D3018" },
+      seller_review:    { label: "COUNTER OFFER",    color: "#F5E642", bg: "#2D3018" },
+      awaiting_payment: { label: "AWAITING PAYMENT", color: "#F5E642", bg: "#2D3018" },
+      payment_secured:  { label: "PAYMENT SECURED",  color: "#00C896", bg: "#00C89615" },
+      delivered:        { label: "DELIVERED",        color: "#F5E642", bg: "#2D3018" },
+      released:         { label: "RELEASED",         color: "#00C896", bg: "#00C89615" },
+      disputed:         { label: "DISPUTED",         color: "#FF4D4F", bg: "#FF4D4F15" },
+      resolved:         { label: "RESOLVED",         color: "#00C896", bg: "#00C89615" },
+      refunded:         { label: "REFUNDED",         color: "#8B949E", bg: "#21262D" },
     };
-    return map[status] ?? { label: status.toUpperCase(), color: "#F5E642", bg: "#2D3018" };
+    return map[phase] ?? { label: String(escrow.status).toUpperCase(), color: "#F5E642", bg: "#2D3018" };
   };
 
-  const statusDisplay = getStatusDisplay(escrow.status);
+  const statusDisplay = getStatusDisplay();
 
 
   const handleAddSellerTerms = async () => {
@@ -405,18 +381,80 @@ export default function EscrowDetailScreen() {
     }
   };
 
-  const handleConfirmAgreement = async () => {
+  const walletBalance = Number(balanceData?.balance || 0);
+  const hasEnoughBalance = walletBalance >= amount;
+  const isPaying = confirmAgreementMutation.isPending || fundEscrowMutation.isPending;
+
+  const promptTopUp = (afterAccept: boolean) => {
     showDialog({
-      title: "Accept & Lock Escrow",
-      message: `Both parties agree. Lock the escrow at ${formatCurrency(amount)}?`,
-      confirmLabel: "Lock",
+      title: "Top up to pay",
+      message: `${afterAccept ? "Terms accepted. " : ""}You need ${formatCurrency(amount)} to secure this deal. Your wallet has ${formatCurrency(walletBalance)}. Top up, then come back and tap Pay.`,
+      confirmLabel: "Top Up Wallet",
+      cancelLabel: "Later",
+      onConfirm: () => router.push("/wallet/fund"),
+    });
+  };
+
+  // Moves money from the wallet into escrow → "Payment Secured".
+  const payIntoEscrow = async () => {
+    try {
+      await fundEscrowMutation.mutateAsync();
+      showToast("Payment secured. The seller has been notified to deliver.", "success");
+    } catch (e: any) {
+      showToast(
+        e?.response?.data?.message || "Payment failed. Tap Pay to try again.",
+        "error",
+      );
+    } finally {
+      refetch();
+    }
+  };
+
+  // BUYER: accept the seller's terms and pay in one go. Accepting is final —
+  // the seller is NOT asked to accept again.
+  const handleAcceptAndPay = () => {
+    showDialog({
+      title: "Accept & Pay",
+      message: hasEnoughBalance
+        ? `Accept the seller's terms and pay ${formatCurrency(amount)}. LymPay holds the money and only releases it to the seller when you confirm you got what you paid for.`
+        : `Accept the seller's terms? You'll need to top up ${formatCurrency(amount - walletBalance)} more to pay.`,
+      confirmLabel: hasEnoughBalance ? "Accept & Pay" : "Accept Terms",
+      onConfirm: async () => {
+        let accepted;
+        try {
+          accepted = await confirmAgreementMutation.mutateAsync();
+        } catch (e: any) {
+          showToast(e?.response?.data?.message || "Failed to accept terms", "error");
+          return;
+        }
+        // Only pay if the API actually moved the escrow to "locked".
+        if (accepted && getEscrowPhase(accepted.status) !== "awaiting_payment") {
+          refetch();
+          return;
+        }
+        if (!hasEnoughBalance) {
+          refetch();
+          promptTopUp(true);
+          return;
+        }
+        await payIntoEscrow();
+      },
+    });
+  };
+
+  // SELLER: accept the buyer's counter. Terms become final; buyer then pays.
+  const handleSellerAcceptCounter = () => {
+    showDialog({
+      title: "Accept Buyer's Counter",
+      message: `Agree to the buyer's terms at ${formatCurrency(amount)}? The buyer will then be asked to pay. Don't deliver until you see "Payment Secured" here.`,
+      confirmLabel: "Accept",
       onConfirm: async () => {
         try {
           await confirmAgreementMutation.mutateAsync();
-          showToast("Escrow terms locked", "success");
+          showToast("Terms agreed. Waiting for the buyer's payment.", "success");
           refetch();
         } catch (e: any) {
-          showToast(e?.response?.data?.message || "Failed to confirm agreement", "error");
+          showToast(e?.response?.data?.message || "Failed to accept terms", "error");
         }
       },
     });
@@ -439,43 +477,30 @@ export default function EscrowDetailScreen() {
     }
   };
 
-  const handleFundEscrow = async () => {
-    const balance = balanceData?.balance || 0;
-    if (balance < amount) {
-      showDialog({
-        title: "Insufficient Balance",
-        message: `You need ${formatCurrency(amount)} in your wallet. Current balance: ${formatCurrency(balance)}.`,
-        confirmLabel: "Fund Wallet",
-        cancelLabel: "Cancel",
-        onConfirm: () => router.push("/wallet/fund"),
-      });
+  // BUYER: terms already agreed (e.g. seller accepted the buyer's counter, or
+  // the earlier payment attempt failed) — just pay.
+  const handlePay = () => {
+    if (!hasEnoughBalance) {
+      promptTopUp(false);
       return;
     }
     showDialog({
-      title: "Fund Escrow",
-      message: `Lock ${formatCurrency(amount)} from your wallet into escrow. This cannot be undone until the transaction completes.`,
-      confirmLabel: "Fund Now",
-      onConfirm: async () => {
-        try {
-          await fundEscrowMutation.mutateAsync();
-          showToast("Escrow funded successfully", "success");
-          refetch();
-        } catch (e: any) {
-          showToast(e?.response?.data?.message || "Failed to fund escrow", "error");
-        }
-      },
+      title: "Pay & Secure Deal",
+      message: `Pay ${formatCurrency(amount)} from your wallet. LymPay holds it and only releases it to the seller when you confirm delivery.`,
+      confirmLabel: "Pay Now",
+      onConfirm: payIntoEscrow,
     });
   };
 
   const handleMarkDelivered = async () => {
     showDialog({
-      title: "Mark as Delivered",
-      message: "Confirm you've delivered the item/service to the buyer?",
-      confirmLabel: "Yes, Delivered",
+      title: "Notify Buyer",
+      message: "Confirm you've delivered the item/service. We'll ask the buyer to check it and release your payment.",
+      confirmLabel: "Yes, Notify Buyer",
       onConfirm: async () => {
         try {
           await markDeliveredMutation.mutateAsync();
-          showToast("Marked as delivered", "success");
+          showToast("Buyer notified to confirm delivery", "success");
           refetch();
         } catch (e: any) {
           showToast(e?.response?.data?.message || "Failed to mark delivered", "error");
@@ -486,9 +511,9 @@ export default function EscrowDetailScreen() {
 
   const handleConfirmDelivery = async () => {
     showDialog({
-      title: "Release Funds",
-      message: "⚠️ This releases funds to the seller permanently. Only confirm if you received the item/service as described.",
-      confirmLabel: "Confirm & Release",
+      title: "Release Payment",
+      message: "⚠️ This sends the money to the seller and can't be undone. Only confirm if you received the item/service as agreed.",
+      confirmLabel: "Release Payment",
       onConfirm: async () => {
         try {
           await confirmDeliveryMutation.mutateAsync();
@@ -503,7 +528,7 @@ export default function EscrowDetailScreen() {
 
   const renderStatusBanner = () => {
     const banners: Record<string, { icon: React.ReactNode; title: string; sub: string; bg: string; border: string }> = {
-      pending_seller_agreement: {
+      seller_terms: {
         icon: <Clock size={24} color="#F5E642" />,
         title: isSeller ? "Review Buyer Terms" : "Awaiting Seller Terms",
         sub: isSeller
@@ -512,55 +537,55 @@ export default function EscrowDetailScreen() {
         bg: "#2D3018",
         border: "transparent",
       },
-      pending_buyer_confirmation: {
+      buyer_review: {
         icon: <ShieldCheck size={24} color="#F5E642" />,
-        title: isBuyer ? "Seller Responded — Review Now" : "Waiting for Buyer",
+        title: isBuyer ? "Seller Responded — Your Turn" : "Waiting for Buyer",
         sub: isBuyer
-          ? "The seller added their terms. Accept to lock or send a counter offer."
-          : "Waiting for the buyer to review your terms.",
+          ? "Happy with the seller's terms? Accept & pay to secure the deal, or send a counter."
+          : "The buyer is reviewing your terms. If they accept, they pay straight away — you don't need to accept again.",
         bg: "#2D3018",
         border: "#F5E64240",
       },
-      awaiting_seller_confirmation: {
+      seller_review: {
         icon: <ArrowLeftRight size={24} color="#F5E642" />,
         title: isSeller ? "Buyer Countered — Your Turn" : "Waiting for Seller",
         sub: isSeller
-          ? "The buyer sent a counter offer. Accept to lock or send another counter."
-          : "Waiting for the seller to review your counter offer.",
+          ? "The buyer sent a counter offer. Accept it or send another counter."
+          : "The seller is reviewing your counter offer.",
         bg: "#2D3018",
         border: "#F5E64240",
       },
-      locked: {
+      awaiting_payment: {
         icon: <Lock size={24} color="#F5E642" />,
-        title: "Terms Locked ✓",
+        title: isBuyer ? "Terms Agreed — Pay to Secure" : "Terms Agreed — Awaiting Payment",
         sub: isBuyer
-          ? "Both parties agreed. Fund the escrow to start the transaction."
-          : "Both parties agreed. Waiting for the buyer to fund the escrow.",
+          ? "Pay into escrow. The seller only gets the money after you confirm delivery."
+          : "Waiting for the buyer to pay. Don't deliver until this screen says Payment Secured.",
         bg: "#2D3018",
         border: "#F5E64230",
       },
-      funded: {
-        icon: <Store size={24} color="#3b82f6" />,
-        title: isSeller ? "Funds Received — Deliver Now" : "Waiting for Delivery",
+      payment_secured: {
+        icon: <ShieldCheck size={24} color="#00C896" />,
+        title: isSeller ? "Payment Secured ✓ — Deliver Now" : "Payment Secured ✓",
         sub: isSeller
-          ? "The escrow is funded. Deliver the item/service and mark as delivered."
-          : "The seller has been notified and is preparing your order.",
-        bg: "#1e3a5f30",
-        border: "#3b82f640",
+          ? `${formatCurrency(amount)} is held safely by LymPay. Deliver, then tap "I've Delivered" to notify the buyer. Only trust this screen — never a payment screenshot.`
+          : "Your money is held safely by LymPay. The seller has been told to deliver.",
+        bg: "#00C89615",
+        border: "#00C89640",
       },
-      awaiting_buyer_release: {
+      delivered: {
         icon: <CheckCircle2 size={24} color="#00C896" />,
-        title: isBuyer ? "Confirm Receipt to Release Funds" : "Awaiting Buyer Confirmation",
+        title: isBuyer ? "Seller Says It's Delivered" : "Buyer Notified",
         sub: isBuyer
-          ? "Seller marked as delivered. Confirm receipt to release funds."
-          : "Waiting for the buyer to confirm receipt.",
+          ? "Check what you received. If it's okay, release the payment. If not, report the problem — the money stays held until it's settled."
+          : "The buyer has been asked to confirm delivery and release your payment.",
         bg: "#00C89615",
         border: "#00C89640",
       },
       disputed: {
         icon: <Gavel size={24} color="#FF4D4F" />,
-        title: "Dispute Under Review",
-        sub: "LymPay mediators are reviewing the evidence provided. Funds are locked.",
+        title: "Problem Reported",
+        sub: "The money stays held until this is settled. Respond in the dispute and add any evidence.",
         bg: "#FF4D4F15",
         border: "#FF4D4F40",
       },
@@ -573,7 +598,7 @@ export default function EscrowDetailScreen() {
       },
     };
 
-    const b = banners[escrow.status];
+    const b = banners[phase];
     if (!b) return null;
 
     return (
@@ -624,13 +649,13 @@ export default function EscrowDetailScreen() {
       {
         id: 2,
         title: "Payment Secured",
-        sub: "Buyer funds locked in LymPay vault.",
+        sub: "Buyer paid. LymPay holds the money until delivery is confirmed.",
         time: escrow.funded_at ? formatDate(escrow.funded_at) : "",
       },
       {
         id: 3,
         title: "Item Fulfillment",
-        sub: "Seller delivers the item/service.",
+        sub: "Seller delivers and notifies the buyer.",
         time: escrow.delivery_marked_at ? formatDate(escrow.delivery_marked_at) : "",
       },
       {
@@ -641,16 +666,19 @@ export default function EscrowDetailScreen() {
       },
     ];
 
-    // Determine active stage from status
-    let activeStage = 1;
-    if (escrow.status === "locked") activeStage = 2;
-    if (["funded"].includes(escrow.status)) activeStage = 2;
-    if (["awaiting_buyer_release"].includes(escrow.status)) activeStage = 3;
-    if (["released", "resolved", "refunded"].includes(escrow.status)) activeStage = 4;
+    // Active stage = the step currently waiting on someone.
+    // funded → "Payment Secured" is DONE and delivery is active.
+    const activeStageByPhase: Record<string, number> = {
+      awaiting_payment: 2,
+      payment_secured: 3,
+      disputed: 3,
+      delivered: 4,
+      resolved: 4,
+      refunded: 4,
+      released: 5, // everything complete
+    };
+    const activeStage = activeStageByPhase[phase] ?? 1;
 
-    // Stage 1 is complete when locked or beyond
-    // Stage 2 is complete when funded or beyond
-    // Stage 3 is complete when awaiting_buyer_release or beyond
     const getStageState = (stageId: number) => {
       if (stageId < activeStage) return "completed";
       if (stageId === activeStage) return "active";
@@ -724,7 +752,7 @@ export default function EscrowDetailScreen() {
           )}
 
           {hasMismatch &&
-            ["pending_buyer_confirmation", "awaiting_seller_confirmation"].includes(escrow.status) && (
+            (phase === "buyer_review" || phase === "seller_review") && (
               <View
                 style={{
                   backgroundColor: "#FF8C0015",
@@ -886,12 +914,12 @@ export default function EscrowDetailScreen() {
                   </Text>
                 </View>
               </View>
-              {escrow.status === EscrowStatusEnum.PENDING_BUYER_CONFIRMATION && escrow.buyer_confirmation_deadline && (
+              {(phase === "buyer_review" || phase === "delivered") && escrow.buyer_confirmation_deadline && (
                 <>
                   <View style={{ height: 1, backgroundColor: "#30363D" }} />
                   <View style={{ padding: 16 }}>
                     <Text style={{ fontFamily: "Inter-Bold", color: "#8B949E", fontSize: 8, letterSpacing: 1.5, marginBottom: 4 }}>
-                      BUYER CONFIRMATION DEADLINE
+                      {phase === "delivered" ? "BUYER MUST CONFIRM BY" : "BUYER MUST RESPOND BY"}
                     </Text>
                     <Text style={{ fontFamily: "Inter-Bold", color: "#FF4D4F", fontSize: 14 }}>
                       {formatDate(escrow.buyer_confirmation_deadline)}
@@ -944,7 +972,7 @@ export default function EscrowDetailScreen() {
 
           <View style={{ paddingBottom: 100, gap: 12 }}>
 
-            {escrow.status === "pending_seller_agreement" && isSeller && (
+            {phase === "seller_terms" && isSeller && (
               <Button
                 variant="primary"
                 label="ADD YOUR TERMS"
@@ -956,15 +984,15 @@ export default function EscrowDetailScreen() {
               />
             )}
 
-            {escrow.status === "pending_buyer_confirmation" && isBuyer && (
+            {phase === "buyer_review" && isBuyer && (
               <View style={{ gap: 10 }}>
                 <Button
                   variant="primary"
-                  label="ACCEPT & LOCK"
+                  label={`ACCEPT & PAY ${formatCurrency(amount)}`}
                   textClassName="!text-black !font-inter-bold"
-                  onPress={handleConfirmAgreement}
-                  loading={confirmAgreementMutation.isPending}
-                  disabled={confirmAgreementMutation.isPending}
+                  onPress={handleAcceptAndPay}
+                  loading={isPaying}
+                  disabled={isPaying}
                 />
                 <TouchableOpacity
                   onPress={() => {
@@ -990,13 +1018,13 @@ export default function EscrowDetailScreen() {
               </View>
             )}
 
-            {escrow.status === "awaiting_seller_confirmation" && isSeller && (
+            {phase === "seller_review" && isSeller && (
               <View style={{ gap: 10 }}>
                 <Button
                   variant="primary"
-                  label="ACCEPT & LOCK"
+                  label="ACCEPT BUYER'S COUNTER"
                   textClassName="!text-black !font-inter-bold"
-                  onPress={handleConfirmAgreement}
+                  onPress={handleSellerAcceptCounter}
                   loading={confirmAgreementMutation.isPending}
                   disabled={confirmAgreementMutation.isPending}
                 />
@@ -1013,21 +1041,21 @@ export default function EscrowDetailScreen() {
               </View>
             )}
 
-            {escrow.status === "locked" && isBuyer && (
+            {phase === "awaiting_payment" && isBuyer && (
               <Button
                 variant="primary"
-                label="FUND ESCROW"
+                label={`PAY ${formatCurrency(amount)} & SECURE DEAL`}
                 textClassName="!text-black !font-inter-bold"
-                onPress={handleFundEscrow}
-                loading={fundEscrowMutation.isPending}
-                disabled={fundEscrowMutation.isPending}
+                onPress={handlePay}
+                loading={isPaying}
+                disabled={isPaying}
               />
             )}
 
-            {escrow.status === "funded" && isSeller && (
+            {phase === "payment_secured" && isSeller && (
               <Button
                 variant="primary"
-                label="MARK AS DELIVERED"
+                label="I'VE DELIVERED — NOTIFY BUYER"
                 textClassName="!text-black !font-inter-bold"
                 onPress={handleMarkDelivered}
                 loading={markDeliveredMutation.isPending}
@@ -1035,20 +1063,20 @@ export default function EscrowDetailScreen() {
               />
             )}
 
-            {escrow.status === "funded" && isBuyer && (
+            {phase === "payment_secured" && isBuyer && (
               <Button
-                variant="danger"
-                label="RAISE A DISPUTE"
+                variant="secondary"
+                label="REPORT A PROBLEM"
                 textClassName="!font-inter-bold"
                 onPress={() => router.push(`/escrow/${id}/dispute`)}
               />
             )}
 
-            {escrow.status === "awaiting_buyer_release" && isBuyer && (
+            {phase === "delivered" && isBuyer && (
               <View style={{ gap: 12 }}>
                 <Button
                   variant="primary"
-                  label="CONFIRM & RELEASE FUNDS"
+                  label="IT'S OKAY — RELEASE PAYMENT"
                   textClassName="!text-black !font-inter-bold"
                   onPress={handleConfirmDelivery}
                   loading={confirmDeliveryMutation.isPending}
@@ -1056,14 +1084,14 @@ export default function EscrowDetailScreen() {
                 />
                 <Button
                   variant="danger"
-                  label="RAISE A DISPUTE"
+                  label="NOT OKAY — REPORT A PROBLEM"
                   textClassName="!font-inter-bold"
                   onPress={() => router.push(`/escrow/${id}/dispute`)}
                 />
               </View>
             )}
 
-            {escrow.status === "disputed" && (
+            {phase === "disputed" && (
               <Button
                 variant="danger"
                 label="VIEW DISPUTE"
@@ -1109,7 +1137,7 @@ export default function EscrowDetailScreen() {
 
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                 <Text style={{ fontFamily: "Inter-Bold", color: "white", fontSize: 18 }}>
-                  {escrow.status === "awaiting_seller_confirmation"
+                  {phase === "seller_review"
                     ? "Send Counter Terms"
                     : "Add Your Terms"}
                 </Text>
@@ -1164,14 +1192,14 @@ export default function EscrowDetailScreen() {
                 variant="primary"
                 textClassName="!text-black !font-inter-bold"
                 onPress={
-                  escrow.status === "awaiting_seller_confirmation"
+                  phase === "seller_review"
                     ? handleSellerCounter
                     : handleAddSellerTerms
                 }
                 label={
                   sellerAgreementMutation.isPending
                     ? "Submitting..."
-                    : escrow.status === "awaiting_seller_confirmation"
+                    : phase === "seller_review"
                       ? "SEND COUNTER"
                       : "SUBMIT TERMS"
                 }

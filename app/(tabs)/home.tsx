@@ -33,7 +33,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { LinearGradient } from "expo-linear-gradient";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
-import { getStatusBadgeInfo } from "@/lib/utils/escrow";
+import { getStatusBadgeInfo, isActiveEscrow } from "@/lib/utils/escrow";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -114,20 +114,7 @@ export default function HomeScreen() {
   useRefreshOnFocus(refetchTransactions);
 
   const activeEscrows = (escrowsData?.data || []).filter((e) =>
-    [
-      "pending_seller_agreement",
-      "pending_buyer_confirmation",
-      "pending_seller_confirmation",
-      "awaiting_seller_confirmation",
-      "locked",
-      "funded",
-      "awaiting_buyer_release",
-      "delivered",
-      "locked",
-      "funded",
-      "awaiting_buyer_release",
-      "disputed",
-    ].includes(e.status),
+    isActiveEscrow(e.status),
   );
 
   const recentTransactions = (transactionsData?.data || []).slice(0, 5);
