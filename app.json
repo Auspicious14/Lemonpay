@@ -5,26 +5,29 @@
     "scheme": "lympay",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/Logos/PNG/PNG Coloured.png",
+    "icon": "./assets/app-icon/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/Logos/PNG/PNG Coloured.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#0D1117"
+      "image": "./assets/app-icon/adaptive-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.auspicious14.lymepay",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
       "package": "com.auspicious14.lymepay",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/Logos/PNG/PNG Coloured.png",
-        "backgroundColor": "#0D1117"
+        "foregroundImage": "./assets/app-icon/adaptive-icon.png",
+        "monochromeImage": "./assets/app-icon/adaptive-icon-monochrome.png",
+        "backgroundColor": "#FFFFFF"
       },
       "permissions": [
         "POST_NOTIFICATIONS",
@@ -35,7 +38,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/Logos/PNG/PNG Coloured.png"
+      "favicon": "./assets/app-icon/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -44,16 +47,17 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/Logos/PNG/PNG Coloured.png",
-          "resizeMode": "cover",
-          "backgroundColor": "#F5E642"
+          "image": "./assets/app-icon/adaptive-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
         }
       ],
       [
         "expo-notifications",
         {
-          "icon": "./assets/Logos/PNG/PNG Coloured.png",
-          "color": "#F5E642",
+          "icon": "./assets/app-icon/notification-icon.png",
+          "color": "#00A97A",
           "sounds": []
         }
       ]
