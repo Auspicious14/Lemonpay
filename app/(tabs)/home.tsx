@@ -33,7 +33,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { LinearGradient } from "expo-linear-gradient";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
-import { getStatusBadgeInfo } from "@/lib/utils/escrow";
+import { getStatusBadgeInfo, isActiveEscrow } from "@/lib/utils/escrow";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -114,20 +114,7 @@ export default function HomeScreen() {
   useRefreshOnFocus(refetchTransactions);
 
   const activeEscrows = (escrowsData?.data || []).filter((e) =>
-    [
-      "pending_seller_agreement",
-      "pending_buyer_confirmation",
-      "pending_seller_confirmation",
-      "awaiting_seller_confirmation",
-      "locked",
-      "funded",
-      "awaiting_buyer_release",
-      "delivered",
-      "locked",
-      "funded",
-      "awaiting_buyer_release",
-      "disputed",
-    ].includes(e.status),
+    isActiveEscrow(e.status),
   );
 
   const recentTransactions = (transactionsData?.data || []).slice(0, 5);
@@ -215,15 +202,7 @@ export default function HomeScreen() {
             </Text>
           )}
 
-          <View className="flex-row items-center mb-6">
-            <TrendingUp size={14} color="#00C896" />
-            <Text
-              style={{ fontFamily: "Inter-Medium" }}
-              className="text-[#00C896] text-xs ml-1"
-            >
-              +2.4% this month
-            </Text>
-          </View>
+          <View className="mb-6" />
 
           <View className="flex-row gap-x-3">
             <TouchableOpacity
@@ -259,43 +238,25 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* ESCROW STATS CARD */}
-        <View className="bg-[#161B22] rounded-xl p-5 mt-4 flex-row items-center">
+        {/* CHECK A PAYMENT CODE */}
+        <TouchableOpacity
+          onPress={() => router.push("/verify")}
+          activeOpacity={0.8}
+          className="bg-[#161B22] rounded-xl p-5 mt-4 flex-row items-center border border-[#30363D]"
+        >
+          <View className="w-11 h-11 rounded-xl bg-[#00C896]/20 items-center justify-center mr-4">
+            <ShieldCheck size={22} color="#00C896" />
+          </View>
           <View className="flex-1">
-            <View className="flex-row items-center mb-1">
-              <ShieldCheck size={20} color="#00C896" />
-              <Text
-                style={{ fontFamily: "Inter-Medium" }}
-                className="text-[#8B949E] text-xs ml-2"
-              >
-                Escrow Success Rate
-              </Text>
-            </View>
-            <Text
-              style={{ fontFamily: "Inter-Bold" }}
-              className="text-white text-2xl"
-            >
-              99.8%
+            <Text style={{ fontFamily: "Inter-Bold" }} className="text-white text-sm">
+              Check a payment code
             </Text>
-            <View className="flex-row items-center mt-2">
-              <Lock size={12} color="#8B949E" />
-              <Text
-                style={{ fontFamily: "Inter" }}
-                className="text-[#8B949E] text-[10px] ml-1 uppercase"
-              >
-                Secure by LymPay Guard
-              </Text>
-            </View>
-          </View>
-          <View className="bg-[#00C896]/20 px-3 py-1 rounded-full">
-            <Text
-              style={{ fontFamily: "Inter-Bold" }}
-              className="text-[#00C896] text-[10px] tracking-widest uppercase"
-            >
-              GOLD TIER
+            <Text style={{ fontFamily: "Inter" }} className="text-[#8B949E] text-xs mt-1">
+              Buyer says they've paid? Confirm it with LymPay before you ship.
             </Text>
           </View>
-        </View>
+          <ArrowRight size={16} color="#8B949E" />
+        </TouchableOpacity>
 
         {/* ACTIVE ESCROWS SECTION */}
         <View className="mt-8">
@@ -501,7 +462,7 @@ export default function HomeScreen() {
       </View>
 
       {/* FLOATING ACTION BUTTON */}
-      {!isSeller && (
+      {(
         <TouchableOpacity
           className="absolute bottom-20 right-6 w-14 h-14 rounded-full bg-accent-primary items-center justify-center shadow-lg"
           style={{ elevation: 5 }}

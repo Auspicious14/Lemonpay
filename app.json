@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "LymPay",
-    "slug": "lympay",
+    "slug": "lymepay",
     "scheme": "lympay",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +17,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.auspicious14.lymepay",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {

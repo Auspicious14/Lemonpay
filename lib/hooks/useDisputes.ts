@@ -1,19 +1,54 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, QueryClient } from "@tanstack/react-query";
 import { apiClient } from "../api/client";
 import { ENDPOINTS } from "../api/endpoints";
-import { Dispute, ApiResponse } from "@/types/api";
+import {
+  Dispute,
+  DisputeProposal,
+  DisputeOutcome,
+  BuyerDisputeReason,
+  SellerDisputeReason,
+  ApiResponse,
+} from "@/types/api";
 
-export const useDisputes = () => {
+export interface PickedFile {
+  uri: string;
+  mimeType?: string;
+  fileName?: string;
+}
+
+const toFormFile = (file: PickedFile, fallbackName: string) =>
+  ({
+    uri: file.uri,
+    type: file.mimeType ?? "image/jpeg",
+    name: file.fileName ?? fallbackName,
+  }) as any;
+
+const refreshDispute = (queryClient: QueryClient, uuid: string, escrowMoved = false) => {
+  queryClient.invalidateQueries({ queryKey: ["dispute", uuid] });
+  queryClient.invalidateQueries({ queryKey: ["disputes"] });
+  if (escrowMoved) {
+    queryClient.invalidateQueries({ queryKey: ["escrow"] });
+    queryClient.invalidateQueries({ queryKey: ["my-escrows"] });
+    queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
+    queryClient.invalidateQueries({ queryKey: ["transactions"] });
+  }
+};
+
+/** Lists may come back as a plain array or wrapped in { data: [...] }. */
+const unwrapList = <T,>(data: any): T[] => (Array.isArray(data) ? data : data?.data ?? []);
+
+export const useDisputes = (params?: { type?: "dispute" | "support" | "all" }) => {
   return useQuery<Dispute[]>({
-    queryKey: ["disputes"],
+    queryKey: ["disputes", params?.type ?? "all"],
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<Dispute[]>>(ENDPOINTS.DISPUTES.LIST);
-      return response.data.data;
+      const query = params?.type ? `?type=${params.type}` : "";
+      const response = await apiClient.get<ApiResponse<any>>(`${ENDPOINTS.DISPUTES.LIST}${query}`);
+      return unwrapList<Dispute>(response.data.data);
     },
   });
 };
 
-export const useDisputeDetail = (uuid: string) => {
+export const useDisputeDetail = (uuid: string, options?: { refetchInterval?: number | false }) => {
   return useQuery<Dispute>({
     queryKey: ["dispute", uuid],
     queryFn: async () => {
@@ -21,18 +56,16 @@ export const useDisputeDetail = (uuid: string) => {
       return response.data.data;
     },
     enabled: !!uuid,
+    refetchInterval: options?.refetchInterval,
   });
 };
 
+// ─── OPEN A DISPUTE (buyer or seller) — freezes the escrow ───────────────────
 interface CreateDisputeParams {
   escrow_uuid: string;
   description: string;
-  reason: "not_received" | "not_as_described" | "damaged" | "other";
-  attachment?: {
-    uri: string;
-    mimeType?: string;
-    fileName?: string;
-  };
+  reason: BuyerDisputeReason | SellerDisputeReason;
+  attachment?: PickedFile;
 }
 
 export const useCreateDispute = () => {
@@ -44,41 +77,26 @@ export const useCreateDispute = () => {
       formData.append("escrow_uuid", data.escrow_uuid);
       formData.append("description", data.description);
       formData.append("reason", data.reason);
-      
-      if (data.attachment) {
-        formData.append("attachment", {
-          uri: data.attachment.uri,
-          type: data.attachment.mimeType ?? "image/jpeg",
-          name: data.attachment.fileName ?? "evidence.jpg",
-        } as any);
-      }
+      if (data.attachment) formData.append("attachment", toFormFile(data.attachment, "evidence.jpg"));
 
-      const response = await apiClient.post<ApiResponse<Dispute>>(
-        ENDPOINTS.DISPUTES.CREATE,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const response = await apiClient.post<ApiResponse<Dispute>>(ENDPOINTS.DISPUTES.CREATE, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       return response.data.data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["disputes"] });
+      queryClient.invalidateQueries({ queryKey: ["escrow", vars.escrow_uuid] });
       queryClient.invalidateQueries({ queryKey: ["my-escrows"] });
     },
   });
 };
 
+// ─── SUPPORT TICKET (no escrow, no money) ────────────────────────────────────
 interface CreateSupportTicketParams {
   subject: string;
   description: string;
-  attachment?: {
-    uri: string;
-    mimeType?: string;
-    fileName?: string;
-  };
+  attachment?: PickedFile;
 }
 
 export const useCreateSupportTicket = () => {
@@ -89,24 +107,11 @@ export const useCreateSupportTicket = () => {
       const formData = new FormData();
       formData.append("subject", data.subject);
       formData.append("description", data.description);
+      if (data.attachment) formData.append("attachment", toFormFile(data.attachment, "support.jpg"));
 
-      if (data.attachment) {
-        formData.append("attachment", {
-          uri: data.attachment.uri,
-          type: data.attachment.mimeType ?? "image/jpeg",
-          name: data.attachment.fileName ?? "support.jpg",
-        } as any);
-      }
-
-      const response = await apiClient.post<ApiResponse<Dispute>>(
-        ENDPOINTS.DISPUTES.CREATE, // Same as CREATE dispute
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const response = await apiClient.post<ApiResponse<Dispute>>(ENDPOINTS.DISPUTES.CREATE, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       return response.data.data;
     },
     onSuccess: () => {
@@ -115,34 +120,75 @@ export const useCreateSupportTicket = () => {
   });
 };
 
-export const useSubmitAdditionalEvidence = (uuid: string) => {
+// ─── REPLY (message + up to 5 attachments) ───────────────────────────────────
+export const useSendDisputeMessage = (uuid: string) => {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async (attachment: { uri: string; mimeType?: string; fileName?: string }) => {
+    mutationFn: async (params: { body: string; attachments?: PickedFile[] }) => {
       const formData = new FormData();
-      formData.append("attachment", {
-        uri: attachment.uri,
-        type: attachment.mimeType ?? "image/jpeg",
-        name: attachment.fileName ?? "evidence.jpg",
-      } as any);
+      formData.append("body", params.body);
+      (params.attachments ?? []).slice(0, 5).forEach((file, i) => {
+        formData.append("attachments[]", toFormFile(file, `evidence-${i + 1}.jpg`));
+      });
+      const response = await apiClient.post<ApiResponse<Dispute>>(ENDPOINTS.DISPUTES.MESSAGES(uuid), formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data.data;
+    },
+    onSuccess: () => refreshDispute(queryClient, uuid),
+  });
+};
 
-      // Fallback: if evidence endpoint doesn't exist, we just simulate it or use the detail endpoint
-      // Given the instructions, we should try to call a real endpoint if possible.
-      // But based on ENDPOINTS, it's not there. I'll add it to ENDPOINTS first.
-      const response = await apiClient.post<ApiResponse<Dispute>>(
-        ENDPOINTS.DISPUTES.EVIDENCE(uuid),
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+// ─── ONE-TAP OFFER (replaces any earlier pending offer) ──────────────────────
+export const useProposeOutcome = (uuid: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { outcome: DisputeOutcome; refund_amount?: number; note?: string }) => {
+      const response = await apiClient.post<ApiResponse<DisputeProposal>>(
+        ENDPOINTS.DISPUTES.PROPOSALS(uuid),
+        params,
       );
       return response.data.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["dispute", uuid] });
+    onSuccess: () => refreshDispute(queryClient, uuid),
+  });
+};
+
+// ─── ACCEPT THE OTHER SIDE'S OFFER → money moves, dispute closes ─────────────
+export const useAcceptProposal = (uuid: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (proposalUuid: string) => {
+      const response = await apiClient.post<ApiResponse<Dispute>>(
+        ENDPOINTS.DISPUTES.ACCEPT_PROPOSAL(uuid, proposalUuid),
+      );
+      return response.data.data;
     },
+    onSuccess: () => refreshDispute(queryClient, uuid, true),
+  });
+};
+
+export const useRejectProposal = (uuid: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (proposalUuid: string) => {
+      const response = await apiClient.post<ApiResponse<Dispute>>(
+        ENDPOINTS.DISPUTES.REJECT_PROPOSAL(uuid, proposalUuid),
+      );
+      return response.data.data;
+    },
+    onSuccess: () => refreshDispute(queryClient, uuid),
+  });
+};
+
+// ─── ESCALATE TO A LYMPAY MEDIATOR ───────────────────────────────────────────
+export const useEscalateDispute = (uuid: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post<ApiResponse<Dispute>>(ENDPOINTS.DISPUTES.ESCALATE(uuid));
+      return response.data.data;
+    },
+    onSuccess: () => refreshDispute(queryClient, uuid),
   });
 };

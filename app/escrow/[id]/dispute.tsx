@@ -13,7 +13,10 @@ import {
   Scale,
   Package,
   AlertCircle,
-  CreditCard,
+  PackageX,
+  Clock,
+  Ban,
+  HelpCircle,
   CloudUpload,
   Info,
   X,
@@ -24,6 +27,11 @@ import { Screen } from "@/components/ui/Screen";
 import { Typography } from "@/components/ui/Typography";
 import { useEscrowDetail } from "@/lib/hooks/useEscrow";
 import { useCreateDispute } from "@/lib/hooks/useDisputes";
+import { apiClient } from "@/lib/api/client";
+import { ENDPOINTS } from "@/lib/api/endpoints";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { useAuth } from "@/context/AuthContext";
+import { getUserRole } from "@/lib/utils/escrow";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useToastStore } from "@/store/useToastStore";
 import { useDialogStore } from "@/store/useDialogStore";
@@ -35,11 +43,22 @@ const INPUT_BG = "#21262D";
 const BORDER_COLOR = "#30363D";
 const TEAL = "#00C896";
 
-const DISPUTE_REASONS = [
-  { id: "not_received", label: "Item not received", icon: Package },
-  { id: "not_as_described", label: "Item not as described", icon: AlertCircle },
-  { id: "damaged", label: "Counterfeit item", icon: CreditCard }, // Mapped 'Counterfeit' to 'damaged' as requested
+// Reason codes accepted by the API for each side (a buyer-only reason from a
+// seller returns 403).
+const BUYER_REASONS = [
+  { id: "not_received", label: "I didn't receive it", icon: Package },
+  { id: "wrong_item", label: "Wrong item / not as described", icon: AlertCircle },
+  { id: "damaged_item", label: "It arrived damaged", icon: PackageX },
+  { id: "other", label: "Something else", icon: HelpCircle },
 ] as const;
+
+const SELLER_REASONS = [
+  { id: "buyer_unresponsive", label: "Buyer isn't responding", icon: Clock },
+  { id: "false_non_delivery_claim", label: "Buyer says it wasn't delivered, but it was", icon: Ban },
+  { id: "other", label: "Something else", icon: HelpCircle },
+] as const;
+
+type ReasonId = (typeof BUYER_REASONS)[number]["id"] | (typeof SELLER_REASONS)[number]["id"];
 
 export default function RaiseDisputeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,7 +67,8 @@ export default function RaiseDisputeScreen() {
   const { show: showDialog } = useDialogStore();
 
   const { data: escrow, isLoading: isEscrowLoading } = useEscrowDetail(id || "");
-  const [reason, setReason] = useState<typeof DISPUTE_REASONS[number]["id"] | null>(null);
+  const { user } = useAuth();
+  const [reason, setReason] = useState<ReasonId | null>(null);
   const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState<any[]>([]);
   const [isFocused, setIsFocused] = useState(false);
@@ -68,13 +88,14 @@ export default function RaiseDisputeScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images", "videos"],
+      mediaTypes: ["images"],
       allowsMultipleSelection: true,
-      quality: 0.8,
+      selectionLimit: 5,
+      quality: 0.6, // keeps photos under the 2MB limit for the first file
     });
 
     if (!result.canceled) {
-      setAttachments([...attachments, ...result.assets]);
+      setAttachments([...attachments, ...result.assets].slice(0, 5));
     }
   };
 
@@ -100,12 +121,32 @@ export default function RaiseDisputeScreen() {
         description,
         attachment: firstAttachment,
       });
-      
-      showToast("Dispute raised successfully", "success");
+
+      // Opening takes one file; send any others as evidence in the conversation.
+      const extra = attachments.slice(1);
+      if (extra.length && result?.uuid) {
+        try {
+          const form = new FormData();
+          form.append("body", "More evidence");
+          extra.forEach((a, i) =>
+            form.append("attachments[]", {
+              uri: a.uri,
+              type: a.mimeType ?? "image/jpeg",
+              name: a.fileName ?? `evidence-${i + 2}.jpg`,
+            } as any),
+          );
+          await apiClient.post(ENDPOINTS.DISPUTES.MESSAGES(result.uuid), form, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        } catch {
+          showToast("Problem reported, but some photos didn't upload. Add them in the dispute.", "warning");
+        }
+      }
+
+      showToast("Problem reported. The other side has 48 hours to settle with you.", "success");
       router.replace(`/disputes/${result.uuid}`);
     } catch (error) {
-      console.error("Failed to submit dispute", error);
-      showToast("Failed to raise dispute", "error");
+      showToast(getApiErrorMessage(error, "Failed to report the problem"), "error");
     }
   };
 
@@ -119,7 +160,9 @@ export default function RaiseDisputeScreen() {
     );
   }
 
-  const isSubmitDisabled = !reason || !description || createDisputeMutation.isPending;
+  const isSeller = getUserRole(escrow, user?.id || "") === "seller";
+  const reasons = isSeller ? SELLER_REASONS : BUYER_REASONS;
+  const isSubmitDisabled = !reason || !description.trim() || createDisputeMutation.isPending;
 
   return (
     <Screen>
@@ -182,13 +225,13 @@ export default function RaiseDisputeScreen() {
             style={{ fontFamily: "Inter-ExtraBold" }}
             className="text-white text-[32px] leading-tight"
           >
-            Raise a Dispute
+            Report a Problem
           </Typography>
           <Typography 
             style={{ fontFamily: "Inter" }}
             className="text-gray-400 mt-2 text-sm leading-5"
           >
-            Our neutral mediators will review your claim within 24-48 hours. Funds remain locked in escrow until a resolution is reached.
+            The money stays held. The {isSeller ? "buyer" : "seller"} sees your complaint and you both have 48 hours to settle it — with a refund, a redelivery or a release. If you can't agree, a LymPay mediator decides.
           </Typography>
         </View>
 
@@ -198,9 +241,9 @@ export default function RaiseDisputeScreen() {
             style={{ fontFamily: "Inter-Bold" }}
             className="text-gray-500 text-[10px] uppercase tracking-widest mb-3"
           >
-            Reason for Dispute
+            What went wrong?
           </Typography>
-          {DISPUTE_REASONS.map((item) => {
+          {reasons.map((item) => {
             const isSelected = reason === item.id;
             return (
               <TouchableOpacity
@@ -278,7 +321,7 @@ export default function RaiseDisputeScreen() {
               style={{ fontFamily: "Inter" }}
               className="text-gray-500 text-xs text-center mt-1"
             >
-              Images (JPG, PNG) or Video clips (MP4). Max 50MB.
+              Up to 5 photos (JPG, PNG). Screenshots of chats and delivery photos help.
             </Typography>
             
             <TouchableOpacity
@@ -332,7 +375,7 @@ export default function RaiseDisputeScreen() {
               style={{ fontFamily: "Inter-ExtraBold" }}
               className={`${isSubmitDisabled ? "text-gray-500" : "text-black"} text-base uppercase tracking-widest`}
             >
-              {createDisputeMutation.isPending ? "Submitting..." : "Submit Dispute"}
+              {createDisputeMutation.isPending ? "Submitting..." : "Report Problem"}
             </Typography>
           </LinearGradient>
         </TouchableOpacity>
