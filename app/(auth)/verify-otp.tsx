@@ -57,7 +57,9 @@ export default function VerifyOtpScreen() {
   }, [countdown]);
 
   const handleVerify = () => {
-    if (otp.length !== 4) return;
+    if (otp.length !== 6) {
+      return Toast.show({ message: "Please enter a 6-digit code" });
+    }
 
     if (mode === "register") {
       // Call register directly as it handles OTP verification internally.
@@ -163,7 +165,7 @@ export default function VerifyOtpScreen() {
 
           {/* Boxes Row + Keypad (Internal to OtpInput) */}
           <OtpInput
-            length={4}
+            length={6}
             value={otp}
             onChange={setOtp}
             showCustomKeypad={false}
@@ -173,7 +175,7 @@ export default function VerifyOtpScreen() {
           <View style={{ marginTop: 10 }}>
             <TouchableOpacity
               onPress={handleVerify}
-              disabled={otp.length !== 4 || isLoading}
+              disabled={otp.length !== 6 || isLoading}
               activeOpacity={0.8}
               style={{ marginBottom: 24 }}
             >
@@ -183,7 +185,7 @@ export default function VerifyOtpScreen() {
                 end={{ x: 1, y: 0 }}
                 style={[
                   styles.button,
-                  (otp.length !== 4 || isLoading) && { opacity: 0.6 },
+                  (otp.length !== 6 || isLoading) && { opacity: 0.6 },
                 ]}
               >
                 <Typography variant="body" className="!text-black !font-inter-bold">

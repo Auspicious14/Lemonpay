@@ -40,7 +40,7 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const status = error.response?.status;
     const url = error.config?.url || "";
-
+    console.error({error})
     console.error(`[API ERROR] ${url}:`, {
       status,
       message: error.message,
